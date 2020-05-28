@@ -1,0 +1,50 @@
+{
+    "name": "Demo Problem",
+    "author": "McDic",
+    "parameters": [
+        {
+            "name": "a",
+            "type": "int",
+            "dimension": 0
+        },
+        {
+            "name": "b",
+            "type": "int",
+            "dimension": 0
+        }
+    ],
+    "return": {
+        "type": "int",
+        "dimension": 0
+    },
+    "limits": {
+        "time": 10.0,
+        "memory": 256
+    },
+    "solutions": {
+        "ac": ["solution.py"],
+        "wa": ["wa.py"],
+        "tle": [],
+        "fail": []
+    },
+    "generators": {
+        "sample": "generator.py"
+    },
+    "genscript": [
+        "sample 1", 
+        "sample 3",
+        "sample 10",
+        "sample 100"
+    ],
+    "iofiles": {
+        "path": "IO",
+        "inputsyntax": "%02d.in.txt",
+        "outputsyntax": "%02d.out.txt"
+    },
+    "validator": "validator.py",
+    "precision": 0.001,
+    "version": {
+        "problem": 1.0,
+        "config": 1.0
+    }
+}

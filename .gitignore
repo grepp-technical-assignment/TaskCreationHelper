@@ -1,0 +1,34 @@
+# IDE configuration
+.vscode/
+.idea/
+
+# MacOS misc files
+.DS_Store
+
+# Python stuffs
+**/__pycache__/
+
+# Environment stuffs
+.venv/
+.direnv/
+.envrc
+
+# Binary compiled
+bin/
+
+# I/O files
+*.in
+*.in.txt
+*.out
+*.out.txt
+
+# Log files
+*.log
+
+# Test folders
+**/test/
+
+# Private data
+*.pem
+*.pub
+PrivateData/

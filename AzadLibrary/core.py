@@ -19,7 +19,7 @@ from .constants import (
     DefaultFloatPrecision, DefaultIOPath,
     DefaultInputSyntax, DefaultOutputSyntax,
     DefaultTimeLimit, DefaultMemoryLimit,  # Limits
-    IODataTypesInfo, DefaultTypeStrings,  # IO data types
+    IODataTypesInfo, DefaultTypeStrings, MaxParameterDimensionAllowed,  # IO data types
     SolutionCategory, SourceFileLanguage,  # Source file related
 )
 from .errors import (
@@ -28,7 +28,7 @@ from .errors import (
 )
 from .path import (getExtension, getSourceFileLanguage)
 from .iodata import (
-    cleanIOFilePath, YBMBizeData,
+    cleanIOFilePath, PGizeData,
     checkDataType, checkDataCompatibility,
     compareAnswers
 )
@@ -113,6 +113,9 @@ class AzadCore:
             elif varType not in IODataTypesInfo:
                 raise ValueError("Parameter %s's type is invalid type '%s'" %
                                  (varName, varType))
+            elif not (0 <= dimension <= MaxParameterDimensionAllowed):
+                raise ValueError("Invalid dimension %d for parameter %s given" %
+                                 (dimension, varName))
             self.parameters[varName] = {
                 "order": addedParameters, "type": varType, "dimension": dimension}
             addedParameters += 1
@@ -329,7 +332,7 @@ class AzadCore:
             "Validating generated data's parameter types and compatibility..")
         for name in result:
             if not checkDataType(result[name], self.parameters[name]["type"],
-                                 self.parameters[name]["dimension"], variableName=name):
+                                 self.parameters[name]["dimension"]):
                 raise FailedDataValidation(
                     "Generator '%s' generated wrong type for parameter %s on args %s" %
                     (sourceFilePath, name, args))
@@ -524,7 +527,7 @@ class AzadCore:
                     "Writing %d-th input file '%s'.." %
                     (i, inputFile.name))
                 inputFile.write(",".join(
-                    YBMBizeData(data[name], self.parameters[name]["type"])
+                    PGizeData(data[name], self.parameters[name]["type"])
                     for name in self.parameterNamesSorted))
 
     def makeOutputFiles(self, outputFileSyntax: str = None):
@@ -551,7 +554,7 @@ class AzadCore:
                 self.logger.debug(
                     "Writing %d-th output file '%s'.." %
                     (i, outputFile.name))
-                outputFile.write(YBMBizeData(data, self.returnValue["type"]))
+                outputFile.write(PGizeData(data, self.returnValue["type"]))
 
     def checkAllSolutionFiles(self):
         """

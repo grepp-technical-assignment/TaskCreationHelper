@@ -18,6 +18,7 @@ DefaultInputSyntax = "%02d.in.txt"
 DefaultOutputSyntax = "%02d.out.txt"
 DefaultTimeLimit = 10.0  # seconds
 DefaultMemoryLimit = 256  # megabytes; Not used
+MaxParameterDimensionAllowed = 2
 
 
 # Default typestring for all accepted types.
@@ -183,3 +184,19 @@ class LogLevel(Enum):
     Warn = "Warn"
     Info = "Info"
     Debug = "Debug"
+
+
+# List of exit codes for multiprocessing
+ExitCodeSuccess = 0
+ExitCodeTLE = 1 << 4
+ExitCodeFailGeneral = 1 << 5
+ExitCodeFailDuringDataSending = ExitCodeFailGeneral | 1
+
+
+# Target types for primitive data protocol
+PrimitiveDataProtocolTargetTypes = typing.Union[
+    int, float, bool, None,
+    str, bytes, bytearray,
+    list, tuple, set, frozenset,
+    dict
+]

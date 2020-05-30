@@ -188,9 +188,11 @@ class LogLevel(Enum):
 
 # List of exit codes for multiprocessing
 ExitCodeSuccess = 0
-ExitCodeTLE = 1 << 4
-ExitCodeFailGeneral = 1 << 5
-ExitCodeFailDuringDataSending = ExitCodeFailGeneral | 1
+ExitCodeFailedBase = 32
+ExitCodeTLE = 33
+ExitCodeMLE = 34
+ExitCodeFATAL = 35
+ExitCodeFailedToReturnData = 36
 
 
 # Target types for primitive data protocol
@@ -200,3 +202,13 @@ PrimitiveDataProtocolTargetTypes = typing.Union[
     list, tuple, set, frozenset,
     dict
 ]
+
+
+# Sourcefile Types
+class SourceFileType(Enum):
+    """
+    Enumeration of source file types.
+    """
+    Generator = "generator"
+    Validator = "validator"
+    Solution = "solution"

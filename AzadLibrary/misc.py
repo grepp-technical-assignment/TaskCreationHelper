@@ -2,6 +2,10 @@
 This module contains miscellaneous functions.
 """
 
+# Standard libraries
+import random
+import time
+
 
 def barLine(message: str, lineLength: int = 120) -> str:
     """
@@ -28,6 +32,17 @@ def longEndSkip(message: str, maxLength: int = 100) -> str:
         return message
     else:
         return message[:maxLength - 3] + "..."
+
+
+def randomName(length: int):
+    """
+    Return random name using English letters and numbers.
+    """
+    random.seed(time.time_ns())
+    alphabets = "abcdefghijklmnopqrstuvwxyz"
+    numbers = "0123456789"
+    candidates = alphabets.lower() + alphabets.upper() + numbers
+    return "".join(random.choices(candidates, k=length))
 
 
 if __name__ == "__main__":

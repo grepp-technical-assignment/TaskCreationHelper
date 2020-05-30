@@ -26,7 +26,10 @@ from .errors import (
     AzadError, FailedDataValidation, NotSupportedExtension,
     WrongSolutionFileCategory, VersionError
 )
-from .path import (getExtension, getSourceFileLanguage)
+from .externalmodule import (
+    getExtension, getSourceFileLanguage,
+    prepareModule_old, prepareExecFunc,
+)
 from .iodata import (
     cleanIOFilePath, PGizeData,
     checkDataType, checkDataCompatibility,
@@ -227,27 +230,6 @@ class AzadCore:
         del self.inputDatas
         # self.logger.terminate()  # Log file will be auto terminated
 
-    @staticmethod
-    def prepareModule(sourceFilePath: typing.Union[str, Path],
-                      moduleName: str):
-        """
-        Prepare module from given file name.
-        """
-        # Get filename extension
-        fileExtension = getExtension(sourceFilePath)
-        sourceLanguage = getSourceFileLanguage(sourceFilePath)
-
-        # Extension case handling
-        if sourceLanguage is SourceFileLanguage.Python3:
-            spec = importlib.util.spec_from_file_location(
-                moduleName, sourceFilePath)
-            thisModule = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(thisModule)
-            return thisModule
-        else:
-            raise NotImplementedError(
-                "Extension '%s' is not supported" % (fileExtension,))
-
     def executeValidator(
             self, sourceFilePath: typing.Union[str, Path], data=None):
         """
@@ -263,7 +245,7 @@ class AzadCore:
 
         # Pop validator function
         validation = None
-        sourceModule = AzadCore.prepareModule(sourceFilePath, "validator")
+        sourceModule = prepareModule_old(sourceFilePath, "validator")
         sourceLanguage = getSourceFileLanguage(sourceFilePath)
         if sourceLanguage is SourceFileLanguage.Python3:
             validation = sourceModule.validate
@@ -295,14 +277,14 @@ class AzadCore:
                 self.logger.debug("Validated %d-th input." % (i,))
 
     def executeGenerator(
-            self, sourceFilePath: typing.Union[str, Path], args: typing.Tuple[str]) -> dict:
+            self, sourceFilePath: typing.Union[str, Path], args: typing.List[str]) -> dict:
         """
         Execute generator with given arguments. args is tuple of strings.
         You have to make function `generate(args: string[])` to generate data.
         Generator's return value form should be `{variable name: content}`.
         """
         # Prepare module
-        generateModule = AzadCore.prepareModule(sourceFilePath, "generator")
+        generateModule = prepareModule_old(sourceFilePath, "generator")
         genFunc = None
         sourceLanguage = getSourceFileLanguage(sourceFilePath)
         if sourceLanguage is SourceFileLanguage.Python3:
@@ -395,7 +377,7 @@ class AzadCore:
 
         # Pop solution functions
         solution = None
-        sourceModule = AzadCore.prepareModule(sourceFilePath, "submission")
+        sourceModule = prepareModule_old(sourceFilePath, "submission")
         sourceLanguage = getSourceFileLanguage(sourceFilePath)
         if sourceLanguage is SourceFileLanguage.Python3:
             solution = sourceModule.solution
@@ -422,7 +404,7 @@ class AzadCore:
                                     for varName in varNamesSorted])
                 if not checkDataType(
                         result, self.returnValue["type"],
-                        self.returnValue["dimension"], "return value"):
+                        self.returnValue["dimension"]):
                     raise FailedDataValidation(
                         "Solution %s generated wrong type of data on %d-th testcase" %
                         (sourceFilePath, i))

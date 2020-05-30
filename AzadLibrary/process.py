@@ -128,6 +128,7 @@ class BaseAzadProcess(SpawnContext.Process):
         """
         Clean external files which are used by process.
         This method should be runned by parent process of this.
+        Take `self.returnedValue` as returned value from process target.
         """
         if self.is_alive():
             raise Exception(
@@ -136,10 +137,14 @@ class BaseAzadProcess(SpawnContext.Process):
             return
 
         # Json Outfile
-        if self.jsonOutFilePath.exists() and self.jsonOutFilePath.is_file():
-            with open(self.jsonOutFilePath, "r") as jsonFile:
-                self.returnedValue = json.load(jsonFile)
+        if self.exitcode == ExitCodeSuccess:
+            if self.jsonOutFilePath.exists() and self.jsonOutFilePath.is_file():
+                with open(self.jsonOutFilePath, "r") as jsonFile:
+                    self.returnedValue = json.load(jsonFile)
+        try:
             os.remove(self.jsonOutFilePath)
+        except FileNotFoundError:
+            pass
 
         # Mark as cleaned
         self.outfileCleaned = True

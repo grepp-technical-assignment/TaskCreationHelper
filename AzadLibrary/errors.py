@@ -47,3 +47,9 @@ class WrongSolutionFileCategory(AzadError):
         self.sourceFileName = sourceFileName
         self.targetVerdict = targetVerdict
         self.actualVerdict = actualVerdict
+
+
+class AzadTLE(AzadError, TimeoutError):
+    """
+    Raised when execution exceeded TLE.
+    """

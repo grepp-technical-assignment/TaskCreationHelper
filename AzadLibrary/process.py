@@ -8,17 +8,17 @@ import typing
 from pathlib import Path
 import time
 import os
-import sys
 from threading import Thread
 import multiprocessing
 import json
+import traceback
 
 # Azad libraries
 from .errors import AzadTLE
 from .constants import (
     SourceFileType,
-    ExitCodeSuccess, ExitCodeFailedBase,
-    ExitCodeTLE, ExitCodeMLE, ExitCodeFATAL,
+    ExitCodeSuccess, ExitCodeFailGeneral,
+    ExitCodeTLE, ExitCodeMLE,
     ExitCodeFailedToReturnData,
 )
 from .externalmodule import prepareExecFunc
@@ -41,11 +41,11 @@ class BaseAzadProcess(SpawnContext.Process):
     maxDT = 100
 
     def __init__(self, *args__, timelimit: float = None,
-                 jsonOutFilePath: typing.Union[Path, str] = None,
+                 outFilePath: typing.Union[Path, str] = None,
                  **kwargs__):
         """
         If `timelimit` is given, then the process will automatically terminates after execution.
-        If `jsonOutFile` is given, then the result will be outputted into jsonOutFile with json format.
+        If `outFilePath` is given, then the result will be outputted into file with json/traceback format.
             Give this argument only if when your function returns primitive type only.
         """
 
@@ -61,15 +61,15 @@ class BaseAzadProcess(SpawnContext.Process):
                 "Non-positive timelimit %gs given." % (self.timelimit,))
 
         # Json Outfile
-        self.jsonOutFilePath = Path(jsonOutFilePath) \
-            if jsonOutFilePath else None
-        if self.jsonOutFilePath and self.jsonOutFilePath.exists():
+        self.outFilePath = Path(outFilePath) if outFilePath else None
+        if self.outFilePath and self.outFilePath.exists():
             raise OSError("Target file '%s' already exists" %
-                          (self.jsonOutFilePath,))
+                          (self.outFilePath,))
 
         # Misc
         self.outfileCleaned = False
         self.returnedValue = None
+        self.raisedTraceback = None
 
     def getCapsule(self):
         """
@@ -78,15 +78,19 @@ class BaseAzadProcess(SpawnContext.Process):
         """
         def func(*args, **kwargs):
             nonlocal self
-            self.capsuleResult = self._target(*self._args, **self._kwargs)
+            try:
+                self.capsuleResult = self._target(*self._args, **self._kwargs)
+            except BaseException as err:
+                self.capsuleException = err
         return func
 
-    def _loopPhase(self):
+    def run(self):
         """
-        Loop phase of execution.
-        This phase determines TLE or not.
+        Actual execution process.
+        Function return result will be `self.capsuleResult`.
         """
         self.capsuleResult = None
+        self.capsuleException = None
         mainThread = Thread(
             target=self.getCapsule(),
             args=self._args, kwargs=self._kwargs,
@@ -104,25 +108,27 @@ class BaseAzadProcess(SpawnContext.Process):
                     break
                 else:
                     time.sleep(self.minDT)
-        except AzadTLE:
+        except AzadTLE:  # TLE
             exit(ExitCodeTLE)
-        except BaseException:
-            exit(ExitCodeFATAL)
-
-    def run(self):
-        """
-        Actual execution process.
-        Function return result will be `self.capsuleResult`.
-        """
-        self._loopPhase()
-        try:
-            if self.jsonOutFilePath:
-                with open(self.jsonOutFilePath, "w") as outFile:
-                    json.dump(self.capsuleResult, outFile)
-        except BaseException:
-            exit(ExitCodeFailedToReturnData)
-        else:
-            exit(ExitCodeSuccess)
+        else:  # Thread terminated
+            try:
+                if self.outFilePath:
+                    with open(self.outFilePath, "w") as outFile:
+                        if self.capsuleException is None:
+                            json.dump(self.capsuleResult, outFile)
+                        else:
+                            traceback.print_exception(
+                                type(self.capsuleException),
+                                self.capsuleException,
+                                self.capsuleException.__traceback__,
+                                file=outFile)
+            except BaseException:  # Failed to return data
+                exit(ExitCodeFailedToReturnData)
+            else:
+                if self.capsuleException:  # General execution failure
+                    exit(ExitCodeFailGeneral)
+                else:  # Successful termination
+                    exit(ExitCodeSuccess)
 
     def cleanOutFile(self):
         """
@@ -138,20 +144,25 @@ class BaseAzadProcess(SpawnContext.Process):
 
         # Json Outfile
         if self.exitcode == ExitCodeSuccess:
-            if self.jsonOutFilePath.exists() and self.jsonOutFilePath.is_file():
-                with open(self.jsonOutFilePath, "r") as jsonFile:
+            if self.outFilePath.exists() and self.outFilePath.is_file():
+                with open(self.outFilePath, "r") as jsonFile:
                     self.returnedValue = json.load(jsonFile)
+        elif self.exitcode == ExitCodeFailGeneral:
+            if self.outFilePath.exists() and self.outFilePath.is_file():
+                with open(self.outFilePath, "r") as excFile:
+                    self.raisedTraceback = excFile.read()
         try:
-            os.remove(self.jsonOutFilePath)
+            os.remove(self.outFilePath)
         except FileNotFoundError:
             pass
 
         # Mark as cleaned
         self.outfileCleaned = True
 
-    def join(self):
-        super().join()
-        self.cleanOutFile()
+    def join(self, timeout: float = None):
+        super().join(timeout=timeout)
+        if not self.is_alive():
+            self.cleanOutFile()
 
     def terminate(self):
         super().terminate()
@@ -172,13 +183,16 @@ class AzadProcessForModules(BaseAzadProcess):
     Since we can't send non-global function to spawned process (unpicklable),
     we take function which generates real function from module instead,
     and replace target by that real function.
+
+    The reason why I ensure `outFilePath` exists (even though validators
+    doesn't need any return unless we change implementation) is consistency.
     """
 
     def __init__(self,
                  sourceFilePath: typing.Union[str, Path],
                  sourceFileType: SourceFileType,
                  *args__,
-                 jsonOutFilePath: typing.Union[Path, str] = None,
+                 outFilePath: typing.Union[Path, str] = None,
                  **kwargs__):
         """
         You shouldn't give `target` as parameter.
@@ -186,11 +200,10 @@ class AzadProcessForModules(BaseAzadProcess):
 
         if "target" in kwargs__ and kwargs__["target"] is not None:
             raise ValueError("target should be None")
-        elif jsonOutFilePath is None:
-            jsonOutFilePath = "module_" + randomName(64) + ".json"
+        elif outFilePath is None:
+            outFilePath = "module_" + randomName(64) + ".json"
         super().__init__(*args__, target=None,
-                         jsonOutFilePath=jsonOutFilePath,
-                         **kwargs__)
+                         outFilePath=outFilePath, **kwargs__)
         self.sourceFilePath = Path(sourceFilePath)
         self.sourceFileType = sourceFileType
 
@@ -198,12 +211,14 @@ class AzadProcessForModules(BaseAzadProcess):
         """
         Generate and call module function instead of just calling `self._target`.
         """
-
         moduleFunc = prepareExecFunc(self.sourceFilePath, self.sourceFileType)
 
         def func(*args, **kwargs):
             nonlocal self, moduleFunc
-            self.capsuleResult = moduleFunc(*self._args, **self._kwargs)
+            try:
+                self.capsuleResult = moduleFunc(*self._args, **self._kwargs)
+            except BaseException as err:
+                self.capsuleException = err
         return func
 
 
@@ -212,7 +227,20 @@ class AzadProcessGenerator(AzadProcessForModules):
     AzadProcess used for generators.
     """
 
+    def __init__(self, sourceFilePath: typing.Union[str, Path],
+                 args: typing.List[str], *args__, **kwargs__):
+        """
+        Just give list of strings to `args`.
+        It will be automatically converted.
+        """
+        super().__init__(
+            sourceFilePath, SourceFileType.Generator,
+            *args__, args=[args], **kwargs__)
+
     def getCapsule(self):
+        """
+        Set random seed before calling actual capsulized function.
+        """
         target = super().getCapsule()
 
         def func(args: typing.List[str]):
@@ -221,28 +249,19 @@ class AzadProcessGenerator(AzadProcessForModules):
             import hashlib
             hashValue = hashlib.sha256("|".join(args).encode()).hexdigest()
             random.seed(hashValue)
-            self.capsuleResult = target(args)
+            target(args)
         return func
 
 
 class AzadProcessValidator(AzadProcessForModules):
     """
     AzadProcess used for validators.
-    Be aware that `AssertionError` is the only allowed exception during validation.
     """
 
-    def getCapsule(self):
-        target = super().getCapsule()
-
-        def func(*args, **kwargs):
-            nonlocal self, target
-            try:
-                target(*args, **kwargs)
-            except AssertionError as err:
-                self.capsuleResult = False
-            else:
-                self.capsuleResult = True
-        return func
+    def __init__(
+            self, sourceFilePath: typing.Union[str, Path], *args__, **kwargs__):
+        super().__init__(
+            sourceFilePath, SourceFileType.Validator, *args__, **kwargs__)
 
 
 class AzadProcessSolution(AzadProcessForModules):
@@ -250,13 +269,10 @@ class AzadProcessSolution(AzadProcessForModules):
     AzadProcess used for solutions.
     """
 
-    def getCapsule(self):
-        target = super().getCapsule()
-
-        def func(*args, **kwargs):
-            nonlocal self, target
-            self.capsuleResult = target(*args, **kwargs)
-        return func
+    def __init__(
+            self, sourceFilePath: typing.Union[str, Path], *args__, **kwargs__):
+        super().__init__(
+            sourceFilePath, SourceFileType.Solution, *args__, **kwargs__)
 
 
 if __name__ == "__main__":

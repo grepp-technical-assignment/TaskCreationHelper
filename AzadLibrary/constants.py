@@ -188,11 +188,10 @@ class LogLevel(Enum):
 
 # List of exit codes for multiprocessing
 ExitCodeSuccess = 0
-ExitCodeFailedBase = 32
+ExitCodeFailGeneral = 32
 ExitCodeTLE = 33
 ExitCodeMLE = 34
-ExitCodeFATAL = 35
-ExitCodeFailedToReturnData = 36
+ExitCodeFailedToReturnData = 35
 
 
 # Target types for primitive data protocol

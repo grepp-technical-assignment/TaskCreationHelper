@@ -20,15 +20,19 @@ from .constants import (
     DefaultInputSyntax, DefaultOutputSyntax,
     DefaultTimeLimit, DefaultMemoryLimit,  # Limits
     IODataTypesInfo, DefaultTypeStrings, MaxParameterDimensionAllowed,  # IO data types
-    SolutionCategory, SourceFileLanguage,  # Source file related
+    SolutionCategory, SourceFileLanguage, SourceFileType,  # Source file related
+    ExitCodeSuccess, ExitCodeTLE, ExitCodeFailGeneral,  # Exit codes
 )
 from .errors import (
     AzadError, FailedDataValidation, NotSupportedExtension,
-    WrongSolutionFileCategory, VersionError
+    WrongSolutionFileCategory, VersionError, AzadTLE
 )
 from .externalmodule import (
     getExtension, getSourceFileLanguage,
     prepareModule_old, prepareExecFunc,
+)
+from .process import (
+    AzadProcessGenerator, AzadProcessSolution, AzadProcessValidator,
 )
 from .iodata import (
     cleanIOFilePath, PGizeData,
@@ -91,8 +95,9 @@ class AzadCore:
 
         # Limits (Memory limit is currently unused)
         self.logger.debug("Validating limits and real number precision..")
-        self.limits = {"time": float(parsedConfig["limits"]["time"]), "memory": int(
-            parsedConfig["limits"]["memory"])}
+        self.limits = {
+            "time": float(parsedConfig["limits"]["time"]),
+            "memory": int(parsedConfig["limits"]["memory"])}
 
         # Floating point precision
         self.floatPrecision = float(parsedConfig["precision"]) \
@@ -244,37 +249,36 @@ class AzadCore:
             data = self.inputDatas
 
         # Pop validator function
-        validation = None
-        sourceModule = prepareModule_old(sourceFilePath, "validator")
-        sourceLanguage = getSourceFileLanguage(sourceFilePath)
-        if sourceLanguage is SourceFileLanguage.Python3:
-            validation = sourceModule.validate
-        else:
-            raise NotSupportedExtension(getExtension(sourceFilePath))
-        if not validation:
-            raise AzadError(
-                "Validation function is invalid in '%s'" %
-                (sourceFilePath,))
-
-        # Validate input
-        self.logger.info("Validating input by '%s'.." % (sourceFilePath,))
-        i = 0
-        for inputData in data:
-            i += 1
-            self.logger.info("Validating %d-th input.." % (i,))
-            try:
-                validation(*[deepcopy(inputData[varName])
-                             for varName in self.parameterNamesSorted])
-            except Exception as err:
-                self.logger.error(
-                    "Validation failed at %d-th input. (%s)" %
-                    (i, type(err)))
-                if err.args:
-                    self.logger.error("Detail log: \"%s\"" %
-                                      (" ".join(err.args),))
-                raise FailedDataValidation().with_traceback(err.__traceback__)
+        processes = [
+            AzadProcessValidator(
+                sourceFilePath,
+                args=[deepcopy(data[i][varName]) for varName in self.parameterNamesSorted])
+            for i in range(len(data))
+        ]
+        for i in range(len(data)):
+            self.logger.debug("Validation process #%d started.." % (i + 1,))
+            processes[i].start()
+        for i in range(len(data)):
+            self.logger.debug("Waiting validation process #%d.." % (i + 1,))
+            processes[i].join()
+        for i in range(len(data)):
+            self.logger.info("Analyzing validation process #%d.." % (i + 1,))
+            if processes[i].exitcode == ExitCodeSuccess:
+                self.logger.debug("  Ok, validation passed.")
+            elif processes[i].exitcode == ExitCodeTLE:
+                raise AzadTLE(
+                    "TLE occurred in validation process #%d" % (i + 1,))
+            elif processes[i].exitcode == ExitCodeFailGeneral:
+                self.logger.debug(
+                    "Exception traceback on validation process #%d:\n%s" %
+                    (i + 1, processes[i].raisedTraceback), maxlen=None)
+                raise FailedDataValidation(
+                    "Some error occurred in validation process #%d (read log)" %
+                    (i + 1,))
             else:
-                self.logger.debug("Validated %d-th input." % (i,))
+                raise FailedDataValidation(
+                    "Unknown error occurred in validation process #%d (Exit code %d)" %
+                    (i + 1, processes[i].exitcode))
 
     def executeGenerator(
             self, sourceFilePath: typing.Union[str, Path], args: typing.List[str]) -> dict:

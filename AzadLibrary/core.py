@@ -252,19 +252,21 @@ class AzadCore:
         processes = [
             AzadProcessValidator(
                 sourceFilePath,
-                args=[deepcopy(data[i][varName]) for varName in self.parameterNamesSorted])
-            for i in range(len(data))
+                args=[deepcopy(data[i][varName])
+                      for varName in self.parameterNamesSorted],
+                timelimit=5.0,
+            ) for i in range(len(data))
         ]
         for i in range(len(data)):
             self.logger.debug("Validation process #%d started.." % (i + 1,))
             processes[i].start()
         for i in range(len(data)):
-            self.logger.debug("Waiting validation process #%d.." % (i + 1,))
+            self.logger.info("Waiting validation process #%d.." % (i + 1,))
             processes[i].join()
         for i in range(len(data)):
-            self.logger.info("Analyzing validation process #%d.." % (i + 1,))
+            self.logger.debug("Analyzing validation process #%d.." % (i + 1,))
             if processes[i].exitcode == ExitCodeSuccess:
-                self.logger.debug("  Ok, validation passed.")
+                self.logger.debug("Ok, validation passed.")
             elif processes[i].exitcode == ExitCodeTLE:
                 raise AzadTLE(
                     "TLE occurred in validation process #%d" % (i + 1,))
@@ -279,6 +281,7 @@ class AzadCore:
                 raise FailedDataValidation(
                     "Unknown error occurred in validation process #%d (Exit code %d)" %
                     (i + 1, processes[i].exitcode))
+        self.logger.info("All validation passed!")
 
     def executeGenerator(
             self, sourceFilePath: typing.Union[str, Path], args: typing.List[str]) -> dict:

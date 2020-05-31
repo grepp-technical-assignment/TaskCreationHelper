@@ -193,16 +193,21 @@ class AzadProcessForModules(BaseAzadProcess):
                  sourceFileType: SourceFileType,
                  *args__,
                  outFilePath: typing.Union[Path, str] = None,
+                 timelimit: float = None,
                  **kwargs__):
         """
-        You shouldn't give `target` as parameter.
+        You should not give `target` as parameter.
+        You should give `timelimit` as parameter,
+        because external module function should have time limit to execute.
         """
 
         if "target" in kwargs__ and kwargs__["target"] is not None:
-            raise ValueError("target should be None")
-        elif outFilePath is None:
+            raise ValueError("target should be None.")
+        elif timelimit is None:
+            raise ValueError("timelimit should be specified.")
+        if outFilePath is None:
             outFilePath = "module_" + randomName(64) + ".json"
-        super().__init__(*args__, target=None,
+        super().__init__(*args__, target=None, timelimit=timelimit,
                          outFilePath=outFilePath, **kwargs__)
         self.sourceFilePath = Path(sourceFilePath)
         self.sourceFileType = sourceFileType

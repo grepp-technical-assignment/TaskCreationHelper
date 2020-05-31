@@ -241,14 +241,13 @@ class AzadCore:
         Execute sourcefile as validator by given file name.
         Validate input file.
         """
-
         # Generate data, if not available
         if data is None:
             if not self.inputDatas:
                 self.inputDatas = self.generateInput()
             data = self.inputDatas
 
-        # Pop validator function
+        # Run multiprocessing
         processes = [
             AzadProcessValidator(
                 sourceFilePath,
@@ -263,6 +262,8 @@ class AzadCore:
         for i in range(len(data)):
             self.logger.info("Waiting validation process #%d.." % (i + 1,))
             processes[i].join()
+
+        # Analyze results
         for i in range(len(data)):
             self.logger.debug("Analyzing validation process #%d.." % (i + 1,))
             if processes[i].exitcode == ExitCodeSuccess:

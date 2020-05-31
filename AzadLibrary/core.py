@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 import importlib.util
 import typing
+import time
 import atexit
 
 # Azad libraries
@@ -22,10 +23,12 @@ from .constants import (
     IODataTypesInfo, DefaultTypeStrings, MaxParameterDimensionAllowed,  # IO data types
     SolutionCategory, SourceFileLanguage, SourceFileType,  # Source file related
     ExitCodeSuccess, ExitCodeTLE, ExitCodeFailGeneral,  # Exit codes
+    ExitCodeFailedInAVPhase, ExitCodeFailedToReturnData,
 )
 from .errors import (
-    AzadError, FailedDataValidation, NotSupportedExtension,
-    WrongSolutionFileCategory, VersionError, AzadTLE
+    AzadError, FailedDataValidation, FailedDataGeneration,
+    NotSupportedExtension, WrongSolutionFileCategory,
+    VersionError, AzadTLE
 )
 from .externalmodule import (
     getExtension, getSourceFileLanguage,
@@ -244,10 +247,11 @@ class AzadCore:
         # Generate data, if not available
         if data is None:
             if not self.inputDatas:
-                self.inputDatas = self.generateInput()
+                self.inputDatas = self.generateInput(validate=False)
             data = self.inputDatas
 
         # Run multiprocessing
+        startTime = time.perf_counter()
         processes = [
             AzadProcessValidator(
                 sourceFilePath,
@@ -269,95 +273,81 @@ class AzadCore:
             if processes[i].exitcode == ExitCodeSuccess:
                 self.logger.debug("Ok, validation passed.")
             elif processes[i].exitcode == ExitCodeTLE:
-                raise AzadTLE(
-                    "TLE occurred in validation process #%d" % (i + 1,))
+                raise AzadTLE("Validation process #%d got TLE" % (i + 1,))
             elif processes[i].exitcode == ExitCodeFailGeneral:
-                self.logger.debug(
-                    "Exception traceback on validation process #%d:\n%s" %
-                    (i + 1, processes[i].raisedTraceback), maxlen=None)
-                raise FailedDataValidation(
-                    "Some error occurred in validation process #%d (read log)" %
-                    (i + 1,))
+                self.logger.error(
+                    "Validation process #%d raised an error:\n%s" %
+                    (i + 1, processes[i].raisedTraceback), maxlen=2000)
+                raise FailedDataValidation
             else:
                 raise FailedDataValidation(
-                    "Unknown error occurred in validation process #%d (Exit code %d)" %
+                    "Validation process #%d with unknown reason (Exit code %d)" %
                     (i + 1, processes[i].exitcode))
-        self.logger.info("All validation passed!")
 
-    def executeGenerator(
-            self, sourceFilePath: typing.Union[str, Path], args: typing.List[str]) -> dict:
-        """
-        Execute generator with given arguments. args is tuple of strings.
-        You have to make function `generate(args: string[])` to generate data.
-        Generator's return value form should be `{variable name: content}`.
-        """
-        # Prepare module
-        generateModule = prepareModule_old(sourceFilePath, "generator")
-        genFunc = None
-        sourceLanguage = getSourceFileLanguage(sourceFilePath)
-        if sourceLanguage is SourceFileLanguage.Python3:
-            genFunc = generateModule.generate
-        else:
-            fileExtension = getExtension(sourceFilePath)
-            raise NotSupportedExtension(fileExtension)
-        if not genFunc:
-            raise FailedDataValidation("Generating function is invalid")
+        # Check performance
+        endTime = time.perf_counter()
+        self.logger.info(
+            "Validated all data in %g seconds." % (endTime - startTime,))
 
-        # Execution
-        hashValue = hashlib.sha256("|".join(args).encode()).hexdigest()
-        random.seed(hashValue)
-        self.logger.debug("Executing genscript '%s' on '%s', hash = '%s..'" %
-                          (" ".join(args), sourceFilePath.name, longEndSkip(hashValue, 20)))
-        result = genFunc(args)
-        self.logger.debug("Result is %s" % (result,), maxlen=500)
-
-        # Analyze execution result
-        if not isinstance(result, dict):
-            raise FailedDataValidation("Generator '%s' generated %s instead of dict" %
-                                       (sourceFilePath, type(result),))
-        elif set(result.keys()) != set(self.parameters.keys()):
-            raise FailedDataValidation("Generator '%s' generated different parameters (%s)" %
-                                       (sourceFilePath, ", ".join(result.keys()),))
-        self.logger.debug(
-            "Validating generated data's parameter types and compatibility..")
-        for name in result:
-            if not checkDataType(result[name], self.parameters[name]["type"],
-                                 self.parameters[name]["dimension"]):
-                raise FailedDataValidation(
-                    "Generator '%s' generated wrong type for parameter %s on args %s" %
-                    (sourceFilePath, name, args))
-            elif not checkDataCompatibility(result[name], self.parameters[name]["type"]):
-                raise FailedDataValidation(
-                    "Generator '%s' generated incompatible %s data for parameter %s on args %s" %
-                    (sourceFilePath, self.parameters[name]["type"], name, args))
-        return result
-
-    def generateInput(self) -> list:
+    def generateInput(self, validate: bool = True) -> list:
         """
         Generate all input data and return.
         """
         if not self.genScripts:
             raise ValueError("There is no genscript")
         self.logger.info("Generating input data..")
+        startTime = time.perf_counter()
 
-        # Execute gen scripts:
-        # Suppose all genscript lines are validated in __init__.
-        result = []
-        i = 0
-        for script in self.genScripts:
-            elements = script.split(" ")
+        # Execute genscripts with multiprocessing.
+        # Suppose all genscript lines are validated before.
+        processes = []
+        for i in range(len(self.genScripts)):
+            genscript = self.genScripts[i]
+            elements = genscript.split(" ")
             genFilePath = self.generators[elements[0]]
-            i += 1
-            self.logger.info("Generating input data #%d.." % (i,))
-            result.append(self.executeGenerator(genFilePath, elements[1:]))
+            args = elements[1:]
+            self.logger.debug("Starting generation process #%d, genscript = '%s'.." %
+                              (i + 1, genscript))
+            processes.append(AzadProcessGenerator(
+                genFilePath, args, self.parameters, timelimit=5.0))
+            processes[-1].start()
+        for i in range(len(self.genScripts)):
+            self.logger.info("Waiting generation process #%d.." % (i + 1,))
+            processes[i].join()
 
-        # If no data produced then raise error
-        if not result:
-            raise FailedDataValidation("No input data generated")
-        else:
-            if self.validator:
-                self.executeValidator(self.validator, result)
-            return result
+        # Analyze results
+        result = []
+        for i in range(len(self.genScripts)):
+            self.logger.debug("Analyzing generation process #%d.." % (i + 1,))
+            if processes[i].exitcode == ExitCodeSuccess:
+                result.append(processes[i].returnedValue)
+            elif processes[i].exitcode == ExitCodeFailedInAVPhase:
+                self.logger.error(
+                    "Generation process #%d generated wrong data:\n%s" %
+                    (i + 1, processes[i].raisedTraceback), maxlen=2000)
+                raise FailedDataGeneration
+            elif processes[i].exitcode == ExitCodeTLE:
+                raise FailedDataGeneration(
+                    "Generation process #%d got TLE" % (i + 1,))
+            elif processes[i].exitcode == ExitCodeFailGeneral:
+                self.logger.error(
+                    "Generation process #%d raised an exception during generation:\n%s" %
+                    (i + 1, processes[i].raisedTraceback), maxlen=2000)
+                raise FailedDataGeneration
+            else:
+                raise FailedDataGeneration(
+                    "Generation process #%d failed with unknown reason (Exit code %d)" %
+                    (i + 1, processes[i].exitcode))
+
+        # Check performance
+        endTime = time.perf_counter()
+        self.logger.info(
+            "Generated all data in %g seconds." % (endTime - startTime,))
+
+        # If there is an validator then validate it
+        if self.validator and validate:
+            self.executeValidator(self.validator, result)
+        return result
 
     def executeSolution(self, sourceFilePath: typing.Union[str, Path],
                         intendedCategory: SolutionCategory = SolutionCategory.AC,

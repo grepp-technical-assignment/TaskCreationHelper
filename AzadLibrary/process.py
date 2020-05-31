@@ -19,10 +19,11 @@ from .constants import (
     SourceFileType,
     ExitCodeSuccess, ExitCodeFailGeneral,
     ExitCodeTLE, ExitCodeMLE,
-    ExitCodeFailedToReturnData,
+    ExitCodeFailedToReturnData, ExitCodeFailedInAVPhase,
 )
 from .externalmodule import prepareExecFunc
 from .misc import randomName
+from .iodata import (checkDataType, checkDataCompatibility)
 
 # Context of spawning process instead of forking
 SpawnContext = multiprocessing.get_context('spawn')
@@ -75,6 +76,8 @@ class BaseAzadProcess(SpawnContext.Process):
         """
         Get capsulized function to execute in loop phase.
         This method can be overrided in subclasses.
+        Capsule function should catch and record raised exception internally,
+        otherwise the process will exit successfully.
         """
         def func(*args, **kwargs):
             nonlocal self
@@ -84,10 +87,10 @@ class BaseAzadProcess(SpawnContext.Process):
                 self.capsuleException = err
         return func
 
-    def run(self):
+    def internalPhaseLoop(self):
         """
-        Actual execution process.
-        Function return result will be `self.capsuleResult`.
+        This is one of execution phases.
+        In this phase, process executes target function under TLE.
         """
         self.capsuleResult = None
         self.capsuleException = None
@@ -104,31 +107,60 @@ class BaseAzadProcess(SpawnContext.Process):
                     raise AzadTLE("Time limit %gs expired." %
                                   (self.timelimit))
                 elif not mainThread.is_alive():
-                    # Successfully terminated
                     break
                 else:
                     time.sleep(self.minDT)
         except AzadTLE:  # TLE
             exit(ExitCodeTLE)
-        else:  # Thread terminated
-            try:
-                if self.outFilePath:
-                    with open(self.outFilePath, "w") as outFile:
-                        if self.capsuleException is None:
-                            json.dump(self.capsuleResult, outFile)
-                        else:
-                            traceback.print_exception(
-                                type(self.capsuleException),
-                                self.capsuleException,
-                                self.capsuleException.__traceback__,
-                                file=outFile)
-            except BaseException:  # Failed to return data
-                exit(ExitCodeFailedToReturnData)
-            else:
-                if self.capsuleException:  # General execution failure
-                    exit(ExitCodeFailGeneral)
-                else:  # Successful termination
-                    exit(ExitCodeSuccess)
+
+    def internalPhaseAfterValidation(self):
+        """
+        This is one of execution phases.
+        In this phase, process validates returned data.
+        Don't confuse this with `validator`, two concepts are different.
+        Override this method in child class to do custom after-validation.
+        """
+        pass
+
+    def internalPhaseWriteOutFile(self):
+        """
+        This is one of execution phases.
+        In this phase, process writes returned value or raised exception
+        to send data to the parent process.
+        """
+        try:
+            if self.outFilePath:
+                with open(self.outFilePath, "w") as outFile:
+                    if self.capsuleException is None:
+                        json.dump(self.capsuleResult, outFile)
+                    else:
+                        traceback.print_exception(
+                            type(self.capsuleException),
+                            self.capsuleException,
+                            self.capsuleException.__traceback__,
+                            file=outFile)
+        except BaseException:  # Failed to return data
+            exit(ExitCodeFailedToReturnData)
+
+    def run(self):
+        """
+        Actual execution process.
+        Function return result will be `self.capsuleResult`.
+        Raised exception will be `self.capsuleException`.
+        """
+        self.internalPhaseLoop()  # Looping phase; TLE will exit here
+        try:
+            self.internalPhaseAfterValidation()
+        except BaseException as err:  # Failed after-validation phase
+            self.capsuleException = err
+            self.internalPhaseWriteOutFile()
+            exit(ExitCodeFailedInAVPhase)
+        else:
+            self.internalPhaseWriteOutFile()
+            if self.capsuleException:  # General execution failure
+                exit(ExitCodeFailGeneral)
+            else:  # Successful termination
+                exit(ExitCodeSuccess)
 
     def cleanOutFile(self):
         """
@@ -141,16 +173,16 @@ class BaseAzadProcess(SpawnContext.Process):
                 "Tried to clean outfiles before process terminated.")
         elif self.outfileCleaned:
             return
+        elif not (self.outFilePath and self.outFilePath.exists()
+                  and self.outFilePath.is_file()):
+            return
 
-        # Json Outfile
-        if self.exitcode == ExitCodeSuccess:
-            if self.outFilePath.exists() and self.outFilePath.is_file():
-                with open(self.outFilePath, "r") as jsonFile:
-                    self.returnedValue = json.load(jsonFile)
-        elif self.exitcode == ExitCodeFailGeneral:
-            if self.outFilePath.exists() and self.outFilePath.is_file():
-                with open(self.outFilePath, "r") as excFile:
-                    self.raisedTraceback = excFile.read()
+        # Proceed
+        with open(self.outFilePath, "r") as outFile:
+            if self.exitcode == ExitCodeSuccess:
+                self.returnedValue = json.load(outFile)
+            else:
+                self.raisedTraceback = outFile.read()
         try:
             os.remove(self.outFilePath)
         except FileNotFoundError:
@@ -179,22 +211,16 @@ class BaseAzadProcess(SpawnContext.Process):
 
 class AzadProcessForModules(BaseAzadProcess):
     """
-    AzadProcess used for general modules.
+    Abstract base of AzadProcess for external modules.
     Since we can't send non-global function to spawned process (unpicklable),
     we take function which generates real function from module instead,
     and replace target by that real function.
-
-    The reason why I ensure `outFilePath` exists (even though validators
-    doesn't need any return unless we change implementation) is consistency.
     """
 
     def __init__(self,
                  sourceFilePath: typing.Union[str, Path],
                  sourceFileType: SourceFileType,
-                 *args__,
-                 outFilePath: typing.Union[Path, str] = None,
-                 timelimit: float = None,
-                 **kwargs__):
+                 *args__, timelimit: float = None, **kwargs__):
         """
         You should not give `target` as parameter.
         You should give `timelimit` as parameter,
@@ -205,10 +231,7 @@ class AzadProcessForModules(BaseAzadProcess):
             raise ValueError("target should be None.")
         elif timelimit is None:
             raise ValueError("timelimit should be specified.")
-        if outFilePath is None:
-            outFilePath = "module_" + randomName(64) + ".json"
-        super().__init__(*args__, target=None, timelimit=timelimit,
-                         outFilePath=outFilePath, **kwargs__)
+        super().__init__(*args__, target=None, timelimit=timelimit, **kwargs__)
         self.sourceFilePath = Path(sourceFilePath)
         self.sourceFileType = sourceFileType
 
@@ -233,14 +256,21 @@ class AzadProcessGenerator(AzadProcessForModules):
     """
 
     def __init__(self, sourceFilePath: typing.Union[str, Path],
-                 args: typing.List[str], *args__, **kwargs__):
+                 args: typing.List[str], parameters: dict, *args__,
+                 outFilePath: typing.Union[str, Path] = None, **kwargs__):
         """
-        Just give list of strings to `args`.
-        It will be automatically converted.
+        For `args`, give list of strings. It will be automatically converted.
+        For `parameters`, give `AzadCore.parameters`.
+        If outFilePath is not given, then process will generate random name.
         """
+        if outFilePath is None:
+            outFilePath = "generator_process_" + randomName(64) + ".temp"
         super().__init__(
             sourceFilePath, SourceFileType.Generator,
-            *args__, args=[args], **kwargs__)
+            *args__, args=[args], outFilePath=outFilePath, **kwargs__)
+
+        # Parameter info; Will be used in after-validation phase.
+        self.parameters = parameters
 
     def getCapsule(self):
         """
@@ -257,10 +287,24 @@ class AzadProcessGenerator(AzadProcessForModules):
             target(args)
         return func
 
+    def internalPhaseAfterValidation(self):
+        """
+        Validate if generated result is fit for target parameters.
+        """
+        assert isinstance(self.capsuleResult, dict)
+        assert set(self.capsuleResult.keys()) == set(self.parameters.keys())
+        for name in self.parameters:
+            assert checkDataType(
+                self.capsuleResult[name], self.parameters[name]["type"],
+                self.parameters[name]["dimension"])
+            assert checkDataCompatibility(
+                self.capsuleResult[name], self.parameters[name]["type"])
+
 
 class AzadProcessValidator(AzadProcessForModules):
     """
     AzadProcess used for validators.
+    Don't confuse concept of `Validator` and internal phase `AfterValidation`.
     """
 
     def __init__(
@@ -275,9 +319,25 @@ class AzadProcessSolution(AzadProcessForModules):
     """
 
     def __init__(
-            self, sourceFilePath: typing.Union[str, Path], *args__, **kwargs__):
+            self, sourceFilePath: typing.Union[str, Path],
+            returnValueInfo: dict, *args__,
+            outFilePath: typing.Union[str, Path] = None, **kwargs__):
+        """
+        If outFilePath is not given, then process will generate random name.
+        """
+        if outFilePath is None:
+            outFilePath = "solution_process_" + randomName(64) + ".temp"
         super().__init__(
             sourceFilePath, SourceFileType.Solution, *args__, **kwargs__)
+
+        # Return value info
+        self.returnValueInfo = returnValueInfo
+
+    def internalPhaseAfterValidation(self):
+        """
+        Validate if generated result is fit for target return value.
+        """
+        raise NotImplementedError
 
 
 if __name__ == "__main__":

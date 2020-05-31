@@ -12,7 +12,13 @@ class AzadError(Exception):
     """
 
 
-class FailedDataValidation(AzadError, ValueError, NameError):
+class FailedDataGeneration(AzadError):
+    """
+    Raised when data generation is failed.
+    """
+
+
+class FailedDataValidation(AzadError, ValueError, TypeError):
     """
     Raised when data validation is failed.
     """

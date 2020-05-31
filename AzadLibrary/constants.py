@@ -192,6 +192,7 @@ ExitCodeFailGeneral = 32
 ExitCodeTLE = 33
 ExitCodeMLE = 34
 ExitCodeFailedToReturnData = 35
+ExitCodeFailedInAVPhase = 36  # Failed in after-validation phase
 
 
 # Target types for primitive data protocol

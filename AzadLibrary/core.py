@@ -141,8 +141,8 @@ class AzadCore:
             raise ValueError(
                 "Return value type '%s' is invalid" % (returnVarType,))
         returnDimension = int(parsedConfig["return"]["dimension"])
-        self.returnValue = {"type": returnVarType,
-                            "dimension": returnDimension}
+        self.returnValueInfo = {"type": returnVarType,
+                                "dimension": returnDimension}
 
         # I/O files
         self.logger.debug("Validating I/O file path..")
@@ -355,6 +355,7 @@ class AzadCore:
         """
         Execute sourcefile as solution by given file name.
         Validate result and category, and return produced answers.
+        If `mainAC` is True, then doesn't check answers and just return.
         """
 
         # Validate parameters
@@ -371,117 +372,74 @@ class AzadCore:
 
         # Generate data. If input data is empty, then generation is forced.
         if not self.inputDatas:
-            self.inputDatas = self.generateInput()
+            self.inputDatas = self.generateInput(validate=True)
 
-        # Pop solution functions
-        solution = None
-        sourceModule = prepareModule_old(sourceFilePath, "submission")
-        sourceLanguage = getSourceFileLanguage(sourceFilePath)
-        if sourceLanguage is SourceFileLanguage.Python3:
-            solution = sourceModule.solution
-        else:
-            raise NotSupportedExtension(getExtension(sourceFilePath))
-        if not solution:
-            raise AzadError("Solution function is invalid in '%s'" %
-                            (sourceFilePath,))
-
-        # Actual invocation
-        self.logger.info(
-            "Executing solution '%s' for %s.." %
-            (sourceFilePath, intendedCategory.value.upper() + (" (MAIN)" if mainAC else "")))
-        varNamesSorted = list(self.parameters.keys())
-        varNamesSorted.sort(key=lambda x: self.parameters[x]["order"])
+        # Do multiprocessing
+        self.logger.info("Analyzing solution '%s'.." % (sourceFilePath,))
+        startTime = time.perf_counter()
+        verdicts = []
         producedAnswers = []
-        verdicts = [None for _ in range(len(self.inputDatas))]
-        i = 0
-        for inputData in self.inputDatas:
-            i += 1
-            self.logger.info("Running %d-th test case.." % (i,))
-            try:
-                result = solution(*[deepcopy(inputData[varName])
-                                    for varName in varNamesSorted])
-                if not checkDataType(
-                        result, self.returnValue["type"],
-                        self.returnValue["dimension"]):
-                    raise FailedDataValidation(
-                        "Solution %s generated wrong type of data on %d-th testcase" %
-                        (sourceFilePath, i))
-                elif not checkDataCompatibility(result, self.returnValue["type"]):
-                    raise FailedDataValidation(
-                        "Solution %s generated incompatible %s data on %d-th testcase" %
-                        (sourceFilePath, self.returnValue["type"], i))
-
-            except (TimeoutError, MemoryError, RuntimeError, FailedDataValidation) as err:  # Error raised
-                actualCategory = SolutionCategory.FAIL
-                if isinstance(err, TimeoutError):
-                    actualCategory = SolutionCategory.TLE
-                elif isinstance(err, MemoryError):
-                    # Memory error is not supported, but accepted
-                    pass
-                else:  # General error
-                    pass
-                verdicts[i - 1] = actualCategory
-
-                # Case handling
-                if mainAC:
-                    raise AzadError(
-                        "Main AC solution got %s" % (actualCategory.value.upper(),))
+        processes = [AzadProcessSolution(
+            sourceFilePath, self.returnValueInfo,
+            args=deepcopy([self.inputDatas[i][varName]
+                           for varName in self.parameterNamesSorted]),
+            timelimit=self.limits["time"]
+        ) for i in range(len(self.inputDatas))]
+        for i in range(len(self.inputDatas)):
+            self.logger.debug("Starting solution process #%d.." % (i + 1,))
+            processes[i].start()
+        for i in range(len(self.inputDatas)):
+            self.logger.info("Waiting solution process #%d.." % (i + 1,))
+            processes[i].join()
+        for i in range(len(self.inputDatas)):
+            self.logger.debug("Analyzing solution process #%d.." % (i + 1,))
+            if processes[i].exitcode == ExitCodeSuccess:
+                # I will implement customized checker,
+                # this is why I separated answer checking from multiprocessing.
+                thisAnswer = processes[i].returnedValue
+                producedAnswers.append(thisAnswer)
+                if mainAC or compareAnswers(
+                        self.producedAnswers[i], thisAnswer,
+                        floatPrecision=self.floatPrecision):
+                    verdicts.append(SolutionCategory.AC)
                 else:
-                    self.logger.debug(
-                        "Solution '%s' got %s on test #%d, which is intended." %
-                        (sourceFilePath, intendedCategory.value.upper(), i))
-
-                # Add dummy value anyway
+                    verdicts.append(SolutionCategory.WA)
+            else:
                 producedAnswers.append(None)
+                if processes[i].exitcode == ExitCodeTLE:
+                    verdicts.append(SolutionCategory.TLE)
+                else:
+                    verdicts.append(SolutionCategory.FAIL)
+            self.logger.debug("Solution '%s' got %s at test #%d." %
+                              (sourceFilePath.parts[-1],
+                               verdicts[-1].value.upper(), i + 1))
 
-            else:  # Produced data well. Check return data type.
-                producedAnswers.append(result)
+        # Validate verdicts
+        endTime = time.perf_counter()
+        self.logger.info(
+            "Executed solution for all data in %g seconds." %
+            (endTime - startTime,))
+        self.logger.info("Answers = %s" % (producedAnswers,))
+        verdictCounts = {category: verdicts.count(category)
+                         for category in SolutionCategory}
+        self.logger.info("Solution '%s' verdict: %s" %
+                         (sourceFilePath.parts[-1],
+                          {key.value.upper(): verdictCounts[key]
+                              for key in verdictCounts}))
+        nonACPriorities = [
+            SolutionCategory.FAIL, SolutionCategory.WA, SolutionCategory.TLE]
+        for verdict in nonACPriorities:
+            if verdictCounts[verdict] > 0:
+                actualCategory = verdict
+                break
+        else:
+            actualCategory = SolutionCategory.AC
 
-        # Do job with total produced answers
-        if not mainAC:
-
-            # Iterate over answer comparisons
-            for i in range(len(producedAnswers)):
-                if verdicts[i] is not None and producedAnswers[i] is None:  # Already verdicted
-                    continue
-                self.logger.debug(
-                    "Comparing %d-th produced answer.. (%s vs %s)" %
-                    (i + 1, self.producedAnswers[i], producedAnswers[i]))
-                gotAC = compareAnswers(
-                    self.producedAnswers[i], producedAnswers[i],
-                    floatPrecision=self.floatPrecision)
-                self.logger.debug("Verdict is %s" % ("AC" if gotAC else "WA",))
-                verdicts[i] = SolutionCategory.AC if gotAC else SolutionCategory.WA
-            verdictCount = {
-                intendedCategory: 0 for intendedCategory in SolutionCategory}
-            for verdict in verdicts:
-                verdictCount[verdict] += 1
-            self.logger.debug("Solution '%s' (Intended to be %s): %s" %
-                              (sourceFilePath, intendedCategory.value.upper(),
-                               ", ".join("%d %s" % (verdictCount[verdict], verdict.value.upper()) for verdict in verdictCount)))
-
-            # Validate total result.
-            # intendedCategory is already validated before.
-            actualVerdict: SolutionCategory = None
-            if verdictCount[SolutionCategory.AC] == len(producedAnswers):
-                actualVerdict = SolutionCategory.AC
-            elif verdictCount[SolutionCategory.FAIL] > 0:
-                actualVerdict = SolutionCategory.FAIL
-            elif verdictCount[SolutionCategory.WA] == 0:
-                actualVerdict = SolutionCategory.TLE
-            else:
-                actualVerdict = SolutionCategory.WA
-            if actualVerdict != intendedCategory:
-                raise WrongSolutionFileCategory(
-                    sourceFilePath, intendedCategory, actualVerdict)
-            else:
-                self.logger.info(
-                    "Solution '%s' worked as intended %s." %
-                    (sourceFilePath, intendedCategory.value.upper()))
-
-        else:  # If mainAC is True, then automatically copy producedAnswers.
-            self.logger.debug("Making produced answers as official..")
-            self.producedAnswers = producedAnswers
+        # Return
+        if actualCategory is not intendedCategory:
+            raise WrongSolutionFileCategory(
+                sourceFilePath, intendedCategory, actualCategory)
+        return producedAnswers
 
         # Return produced answers
         return producedAnswers
@@ -534,7 +492,7 @@ class AzadCore:
                 self.logger.debug(
                     "Writing %d-th output file '%s'.." %
                     (i, outputFile.name))
-                outputFile.write(PGizeData(data, self.returnValue["type"]))
+                outputFile.write(PGizeData(data, self.returnValueInfo["type"]))
 
     def checkAllSolutionFiles(self):
         """
@@ -543,7 +501,7 @@ class AzadCore:
         if not self.solutions[SolutionCategory.AC]:
             raise AzadError("There is no AC solution")
         self.logger.info("Checking all solution files..")
-        self.executeSolution(
+        self.producedAnswers = self.executeSolution(
             self.solutions[SolutionCategory.AC][0], SolutionCategory.AC, mainAC=True)
         for filePath in self.solutions[SolutionCategory.AC][1:]:
             self.executeSolution(filePath, SolutionCategory.AC)

@@ -93,7 +93,7 @@ class BaseAzadProcess(SpawnContext.Process):
         In this phase, process executes target function under TLE.
         """
         self.capsuleResult = None
-        self.capsuleException = None
+        self.capsuleException: BaseException = None
         mainThread = Thread(
             target=self.getCapsule(),
             args=self._args, kwargs=self._kwargs,
@@ -113,11 +113,13 @@ class BaseAzadProcess(SpawnContext.Process):
         except AzadTLE:  # TLE
             exit(ExitCodeTLE)
 
-    def internalPhaseAfterValidation(self):
+    def internalPhaseAfterValidation(self) -> int:
         """
         This is one of execution phases.
         In this phase, process validates returned data.
         Don't confuse this with `validator`, two concepts are different.
+
+        Return value must be `None` or `int` - which will be used for return code.
         Override this method in child class to do custom after-validation.
         """
         pass
@@ -134,6 +136,7 @@ class BaseAzadProcess(SpawnContext.Process):
                     if self.capsuleException is None:
                         json.dump(self.capsuleResult, outFile)
                     else:
+                        assert isinstance(self.capsuleException, BaseException)
                         traceback.print_exception(
                             type(self.capsuleException),
                             self.capsuleException,
@@ -142,12 +145,21 @@ class BaseAzadProcess(SpawnContext.Process):
         except BaseException:  # Failed to return data
             exit(ExitCodeFailedToReturnData)
 
+    def limitRAM(self, newsoft: int):
+        """
+        Limit ram of created process.
+        """
+        import resource
+        oldsoft, hard = resource.getrlimit(resource.RLIMIT_AS)
+        resource.setrlimit(resource.RLIMIT_AS, (newsoft, hard))
+
     def run(self):
         """
         Actual execution process.
         Function return result will be `self.capsuleResult`.
         Raised exception will be `self.capsuleException`.
         """
+        self.limitRAM(1024 << 20)  # Resource limitation
         self.internalPhaseLoop()  # Looping phase; TLE will exit here
         try:
             self.internalPhaseAfterValidation()
@@ -183,10 +195,7 @@ class BaseAzadProcess(SpawnContext.Process):
                 self.returnedValue = json.load(outFile)
             else:
                 self.raisedTraceback = outFile.read()
-        try:
-            os.remove(self.outFilePath)
-        except FileNotFoundError:
-            pass
+        os.remove(self.outFilePath)
 
         # Mark as cleaned
         self.outfileCleaned = True
@@ -323,12 +332,14 @@ class AzadProcessSolution(AzadProcessForModules):
             returnValueInfo: dict, *args__,
             outFilePath: typing.Union[str, Path] = None, **kwargs__):
         """
-        If outFilePath is not given, then process will generate random name.
+        For `returnValueInfo`, give `AzadCore.returnValueInfo`.
+        For `outFilePath`, if not given, then process will generate random name.
         """
         if outFilePath is None:
             outFilePath = "solution_process_" + randomName(64) + ".temp"
         super().__init__(
-            sourceFilePath, SourceFileType.Solution, *args__, **kwargs__)
+            sourceFilePath, SourceFileType.Solution,
+            outFilePath=outFilePath, *args__, **kwargs__)
 
         # Return value info
         self.returnValueInfo = returnValueInfo
@@ -337,7 +348,14 @@ class AzadProcessSolution(AzadProcessForModules):
         """
         Validate if generated result is fit for target return value.
         """
-        raise NotImplementedError
+        assert checkDataType(
+            self.capsuleResult, self.returnValueInfo["type"],
+            self.returnValueInfo["dimension"])
+        assert checkDataCompatibility(
+            self.capsuleResult, self.returnValueInfo["type"])
+
+    def internalPhaseWriteOutFile(self):
+        return super().internalPhaseWriteOutFile()
 
 
 if __name__ == "__main__":

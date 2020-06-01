@@ -52,6 +52,5 @@ Initialize problem folder with Azad library, then you will get sample configurat
 
 These are currently unsupported, but targetted to be supported in future.
 
-- File system to manage temporary files with safety
 - Customized answer checker
 - Cross language sourcefile execution(C++, Java, etc)

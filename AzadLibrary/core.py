@@ -103,11 +103,11 @@ class AzadCore:
         self.limits = {
             "time": float(parsedConfig["limits"]["time"]),
             "memory": float(parsedConfig["limits"]["memory"])}
-        if self.limits["memory"] < 512:
+        if self.limits["memory"] < 256:
             self.logger.warn(
                 "Too low memory limit %gMB detected. MemoryError may be raised from some module imports." %
                 (self.limits["memory"],))
-        elif self.limits["memory"] > (4096):
+        elif self.limits["memory"] > 1024:
             self.logger.warn(
                 "Very large memory limit %gMB detected." % (self.limits["memory"],))
 
@@ -343,7 +343,6 @@ class AzadCore:
             processes.append(AzadProcessGenerator(
                 genFilePath, args, self.parameters,
                 outFilePath=tempOutFilePaths[i],
-                outFileExistenceToleration=True,
                 timelimit=10.0, memlimit=1024))
             processes[-1].start()
         for i in range(len(self.genScripts)):

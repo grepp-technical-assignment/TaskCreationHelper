@@ -46,14 +46,6 @@ class WrongSolutionFileCategory(AzadError):
     Raised when solution file's verdict is different from its category.
     """
 
-    def __init__(self, sourceFileName, targetVerdict: SolutionCategory,
-                 actualVerdict: SolutionCategory, additionalMessage: str = ""):
-        super().__init__("Source file '%s' made verdict %s instead of %s. %s" %
-                         (sourceFileName, actualVerdict, targetVerdict, additionalMessage))
-        self.sourceFileName = sourceFileName
-        self.targetVerdict = targetVerdict
-        self.actualVerdict = actualVerdict
-
 
 class AzadTLE(AzadError, TimeoutError):
     """

@@ -1,5 +1,6 @@
 """
 This module contains various constants for Azad library.
+This module should not import any other part of Azad library.
 """
 
 # Standard libraries
@@ -122,10 +123,11 @@ class SolutionCategory(Enum):
     """
     Enumeration of possible solution file status.
     """
-    AC = "ac"
-    WA = "wa"
-    TLE = "tle"
-    FAIL = "fail"
+    AC = "AC"
+    WA = "WA"
+    TLE = "TLE"
+    MLE = "MLE"
+    FAIL = "FAIL"
 
 
 # Category of source file languages

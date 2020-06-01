@@ -5,6 +5,10 @@ This module contains miscellaneous functions.
 # Standard libraries
 import random
 import time
+import typing
+
+# Azad libraries
+from .constants import (SolutionCategory,)
 
 
 def barLine(message: str, lineLength: int = 120) -> str:
@@ -43,6 +47,35 @@ def randomName(length: int):
     numbers = "0123456789"
     candidates = alphabets.lower() + alphabets.upper() + numbers
     return "".join(random.choices(candidates, k=length))
+
+
+def validateVerdict(verdictCount: dict,
+                    intendedCategories: typing.List[SolutionCategory]) -> bool:
+    """
+    Validate verdict with intended categories.
+    """
+    # Fill unfilled categories
+    for category in intendedCategories:
+        if category not in verdictCount:
+            verdictCount[category] = 0
+
+    # Check
+    foundFeasibleCategories = set()  # This should not be empty
+    for category in verdictCount:
+        if not isinstance(category, SolutionCategory):
+            raise TypeError(
+                "Invalid category type %s in verdictCount found" %
+                (type(category),))
+        elif verdictCount[category] == 0:
+            continue
+        elif category not in intendedCategories:  # Tolerate AC only
+            if category is SolutionCategory.AC:
+                continue
+            else:
+                return False
+        else:
+            foundFeasibleCategories.add(category)
+    return bool(foundFeasibleCategories)
 
 
 if __name__ == "__main__":

@@ -12,6 +12,7 @@ from threading import Thread
 import multiprocessing
 import json
 import traceback
+import resource
 
 # Azad libraries
 from .errors import AzadTLE
@@ -41,13 +42,14 @@ class BaseAzadProcess(SpawnContext.Process):
     minDT = 1 / 20
     maxDT = 100
 
-    def __init__(self, *args__, timelimit: float = None,
+    def __init__(self, *args__, timelimit: float = None, memlimit: float = None,
                  outFilePath: typing.Union[Path, str] = None,
                  **kwargs__):
         """
         If `timelimit` is given, then the process will automatically terminates after execution.
         If `outFilePath` is given, then the result will be outputted into file with json/traceback format.
             Give this argument only if when your function returns primitive type only.
+        If `memlimit` is given, then the process will automatically
         """
 
         super().__init__(*args__, **kwargs__)
@@ -60,6 +62,10 @@ class BaseAzadProcess(SpawnContext.Process):
         elif self.timelimit <= 0:
             raise ValueError(
                 "Non-positive timelimit %gs given." % (self.timelimit,))
+
+        # Memory limit
+        self.memlimit: int = memlimit if memlimit is None \
+            else round(memlimit * (2 ** 20))
 
         # Json Outfile
         self.outFilePath = Path(outFilePath) if outFilePath else None
@@ -93,7 +99,7 @@ class BaseAzadProcess(SpawnContext.Process):
         In this phase, process executes target function under TLE.
         """
         self.capsuleResult = None
-        self.capsuleException: BaseException = None
+        self.capsuleException: Exception = None
         mainThread = Thread(
             target=self.getCapsule(),
             args=self._args, kwargs=self._kwargs,
@@ -142,16 +148,17 @@ class BaseAzadProcess(SpawnContext.Process):
                             self.capsuleException,
                             self.capsuleException.__traceback__,
                             file=outFile)
-        except BaseException:  # Failed to return data
+        except Exception:  # Failed to return data
             exit(ExitCodeFailedToReturnData)
 
-    def limitRAM(self, newsoft: int):
+    def limitRAM(self, newSoft: int = None):
         """
         Limit ram of created process.
+        If `newSoft` is None, then the original hard limit will be applied.
         """
-        import resource
-        oldsoft, hard = resource.getrlimit(resource.RLIMIT_AS)
-        resource.setrlimit(resource.RLIMIT_AS, (newsoft, hard))
+        oldSoft, hard = resource.getrlimit(resource.RLIMIT_AS)
+        resource.setrlimit(resource.RLIMIT_AS,
+                           (hard if newSoft is None else newSoft, hard))
 
     def run(self):
         """
@@ -159,20 +166,34 @@ class BaseAzadProcess(SpawnContext.Process):
         Function return result will be `self.capsuleResult`.
         Raised exception will be `self.capsuleException`.
         """
-        self.limitRAM(1024 << 20)  # Resource limitation
-        self.internalPhaseLoop()  # Looping phase; TLE will exit here
+        self.limitRAM(self.memlimit)  # Resource limitation
+
+        # Looping phase; TLE will exit here
+        self.internalPhaseLoop()
+        if self.capsuleException is not None:
+            self.internalPhaseWriteOutFile()
+            if isinstance(self.capsuleException, MemoryError):
+                exit(ExitCodeMLE)
+            elif isinstance(self.capsuleException, OSError) and \
+                    self.capsuleException.errno == 12:
+                exit(ExitCodeMLE)
+            else:
+                exit(ExitCodeFailGeneral)
+
+        # After-validation phase
         try:
             self.internalPhaseAfterValidation()
-        except BaseException as err:  # Failed after-validation phase
+        except Exception as err:
             self.capsuleException = err
             self.internalPhaseWriteOutFile()
             exit(ExitCodeFailedInAVPhase)
-        else:
-            self.internalPhaseWriteOutFile()
-            if self.capsuleException:  # General execution failure
-                exit(ExitCodeFailGeneral)
-            else:  # Successful termination
-                exit(ExitCodeSuccess)
+
+        # Final execution
+        self.internalPhaseWriteOutFile()
+        if self.capsuleException:  # General execution failure
+            exit(ExitCodeFailGeneral)
+        else:  # Successful termination
+            exit(ExitCodeSuccess)
 
     def cleanOutFile(self):
         """
@@ -213,10 +234,6 @@ class BaseAzadProcess(SpawnContext.Process):
         super().kill()
         self.cleanOutFile()
 
-    def close(self):
-        super().close()
-        self.cleanOutFile()
-
 
 class AzadProcessForModules(BaseAzadProcess):
     """
@@ -228,11 +245,12 @@ class AzadProcessForModules(BaseAzadProcess):
 
     def __init__(self,
                  sourceFilePath: typing.Union[str, Path],
-                 sourceFileType: SourceFileType,
-                 *args__, timelimit: float = None, **kwargs__):
+                 sourceFileType: SourceFileType, *args__,
+                 timelimit: float = None, memlimit: float = None,
+                 **kwargs__):
         """
         You should not give `target` as parameter.
-        You should give `timelimit` as parameter,
+        You should give `timelimit` and `memlimit` as parameter,
         because external module function should have time limit to execute.
         """
 
@@ -240,7 +258,10 @@ class AzadProcessForModules(BaseAzadProcess):
             raise ValueError("target should be None.")
         elif timelimit is None:
             raise ValueError("timelimit should be specified.")
-        super().__init__(*args__, target=None, timelimit=timelimit, **kwargs__)
+        elif memlimit is None:
+            raise ValueError("memlimit should be specified.")
+        super().__init__(*args__, target=None, timelimit=timelimit,
+                         memlimit=memlimit, **kwargs__)
         self.sourceFilePath = Path(sourceFilePath)
         self.sourceFileType = sourceFileType
 
@@ -254,7 +275,7 @@ class AzadProcessForModules(BaseAzadProcess):
             nonlocal self, moduleFunc
             try:
                 self.capsuleResult = moduleFunc(*self._args, **self._kwargs)
-            except BaseException as err:
+            except Exception as err:
                 self.capsuleException = err
         return func
 
@@ -348,14 +369,17 @@ class AzadProcessSolution(AzadProcessForModules):
         """
         Validate if generated result is fit for target return value.
         """
-        assert checkDataType(
-            self.capsuleResult, self.returnValueInfo["type"],
-            self.returnValueInfo["dimension"])
-        assert checkDataCompatibility(
-            self.capsuleResult, self.returnValueInfo["type"])
-
-    def internalPhaseWriteOutFile(self):
-        return super().internalPhaseWriteOutFile()
+        try:
+            assert checkDataType(
+                self.capsuleResult, self.returnValueInfo["type"],
+                self.returnValueInfo["dimension"])
+            assert checkDataCompatibility(
+                self.capsuleResult, self.returnValueInfo["type"])
+        except AssertionError as err:
+            print("capsule result %s, capsule exception %s, err %s" %
+                  (self.capsuleResult, type(self.capsuleException), err.args))
+            time.sleep(0.1)
+            raise err
 
 
 if __name__ == "__main__":

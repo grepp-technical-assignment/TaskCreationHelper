@@ -13,6 +13,7 @@ import importlib.util
 import typing
 import time
 import atexit
+import gc
 
 # Azad libraries
 from .constants import (
@@ -22,8 +23,8 @@ from .constants import (
     DefaultTimeLimit, DefaultMemoryLimit,  # Limits
     IODataTypesInfo, DefaultTypeStrings, MaxParameterDimensionAllowed,  # IO data types
     SolutionCategory, SourceFileLanguage, SourceFileType,  # Source file related
-    ExitCodeSuccess, ExitCodeTLE, ExitCodeFailGeneral,  # Exit codes
-    ExitCodeFailedInAVPhase, ExitCodeFailedToReturnData,
+    ExitCodeSuccess, ExitCodeTLE, ExitCodeMLE,
+    ExitCodeFailGeneral, ExitCodeFailedInAVPhase, ExitCodeFailedToReturnData,  # Exit codes
 )
 from .errors import (
     AzadError, FailedDataValidation, FailedDataGeneration,
@@ -48,7 +49,7 @@ from .syntax import (
     cleanGenscript, generatorNamePattern,
     inputFilePattern, outputFilePattern,
 )
-from .misc import (longEndSkip,)
+from .misc import (longEndSkip, validateVerdict)
 
 
 class AzadCore:
@@ -170,21 +171,31 @@ class AzadCore:
                 "Output file syntax '%s' doesn't match syntax" %
                 (self.outputFilePathSyntax,))
 
+        # Pick category from word ac/wa/tle/mle/fail
+        def pickCategory(word: str) -> SolutionCategory:
+            for category in SolutionCategory:
+                if category.value == word:
+                    return category
+            else:
+                raise ValueError("No matching category for word %s" % (word,))
+
         # Solution files
         self.logger.debug("Validating solution files..")
         self.solutions = {}
-        for category in SolutionCategory:
-            if category.value not in parsedConfig["solutions"]:
-                self.solutions[category] = []
-            else:
-                self.solutions[category] = [
-                    self.configDirectory / v for v in parsedConfig["solutions"][category.value]]
-                for p in self.solutions[category]:
-                    if not p.is_file():
-                        raise FileNotFoundError(
-                            "Solution '%s'(%s) is not a file" % (p, category.value))
-        if not self.solutions[SolutionCategory.AC]:
-            self.logger.warn("There is no AC solution.")
+        for key in parsedConfig["solutions"]:
+            thisCategories = tuple(
+                pickCategory(word.upper()) for word in sorted(set(key.split("/"))))
+            if thisCategories not in self.solutions:
+                self.solutions[thisCategories] = []
+            for value in parsedConfig["solutions"][key]:
+                thisPath: Path = self.configDirectory / value
+                self.solutions[thisCategories].append(thisPath)
+                if not thisPath.is_file():
+                    raise FileNotFoundError(
+                        "Solution '%s'(%s) is not a file" %
+                        (thisPath, ",".join(c.value.upper() for c in thisCategories)))
+        if (SolutionCategory.AC,) not in self.solutions:
+            self.logger.warn("There is no AC-only solution.")
 
         # Generators
         self.logger.debug("Validating generator files..")
@@ -257,7 +268,7 @@ class AzadCore:
                 sourceFilePath,
                 args=[deepcopy(data[i][varName])
                       for varName in self.parameterNamesSorted],
-                timelimit=5.0,
+                timelimit=5.0, memlimit=256,
             ) for i in range(len(data))
         ]
         for i in range(len(data)):
@@ -283,6 +294,8 @@ class AzadCore:
                 raise FailedDataValidation(
                     "Validation process #%d with unknown reason (Exit code %d)" %
                     (i + 1, processes[i].exitcode))
+            processes[i].close()
+            gc.collect()
 
         # Check performance
         endTime = time.perf_counter()
@@ -309,7 +322,7 @@ class AzadCore:
             self.logger.debug("Starting generation process #%d, genscript = '%s'.." %
                               (i + 1, genscript))
             processes.append(AzadProcessGenerator(
-                genFilePath, args, self.parameters, timelimit=5.0))
+                genFilePath, args, self.parameters, timelimit=10.0, memlimit=1024))
             processes[-1].start()
         for i in range(len(self.genScripts)):
             self.logger.info("Waiting generation process #%d.." % (i + 1,))
@@ -329,6 +342,9 @@ class AzadCore:
             elif processes[i].exitcode == ExitCodeTLE:
                 raise FailedDataGeneration(
                     "Generation process #%d got TLE" % (i + 1,))
+            elif processes[i].exitcode == ExitCodeMLE:
+                raise FailedDataGeneration(
+                    "Generation process #%d got MLE" % (i + 1,))
             elif processes[i].exitcode == ExitCodeFailGeneral:
                 self.logger.error(
                     "Generation process #%d raised an exception during generation:\n%s" %
@@ -338,6 +354,8 @@ class AzadCore:
                 raise FailedDataGeneration(
                     "Generation process #%d failed with unknown reason (Exit code %d)" %
                     (i + 1, processes[i].exitcode))
+            processes[i].close()
+            gc.collect()
 
         # Check performance
         endTime = time.perf_counter()
@@ -350,7 +368,8 @@ class AzadCore:
         return result
 
     def executeSolution(self, sourceFilePath: typing.Union[str, Path],
-                        intendedCategory: SolutionCategory = SolutionCategory.AC,
+                        intendedCategories: typing.List[SolutionCategory]
+                        = (SolutionCategory.AC,),
                         mainAC: bool = False) -> list:
         """
         Execute sourcefile as solution by given file name.
@@ -359,16 +378,18 @@ class AzadCore:
         """
 
         # Validate parameters
-        if sourceFilePath not in self.solutions[intendedCategory]:
+        if isinstance(intendedCategories, SolutionCategory):
+            intendedCategories = (intendedCategories,)
+        elif not isinstance(intendedCategories, (list, tuple)):
+            raise TypeError("Invalid type %s given for category" %
+                            (type(intendedCategories),))
+        if intendedCategories != (SolutionCategory.AC,) and mainAC:
+            raise ValueError("Category is %s but mainAC is True" %
+                             (",".join(c.value.upper() for c in intendedCategories)))
+        if sourceFilePath not in self.solutions[intendedCategories]:
             self.logger.warn(
                 "You are trying to execute non-registered solution file '%s' (%s)" %
-                (sourceFilePath, intendedCategory.value))
-        if not isinstance(intendedCategory, SolutionCategory):
-            raise TypeError("Invalid type %s given for category" %
-                            (type(intendedCategory),))
-        elif intendedCategory is not SolutionCategory.AC and mainAC:
-            raise ValueError("Category is %s but mainAC is True" %
-                             (intendedCategory.value,))
+                (sourceFilePath, ",".join(c.value.upper() for c in intendedCategories)))
 
         # Generate data. If input data is empty, then generation is forced.
         if not self.inputDatas:
@@ -383,7 +404,7 @@ class AzadCore:
             sourceFilePath, self.returnValueInfo,
             args=deepcopy([self.inputDatas[i][varName]
                            for varName in self.parameterNamesSorted]),
-            timelimit=self.limits["time"]
+            timelimit=self.limits["time"], memlimit=self.limits["memory"]
         ) for i in range(len(self.inputDatas))]
         for i in range(len(self.inputDatas)):
             self.logger.debug("Starting solution process #%d.." % (i + 1,))
@@ -408,8 +429,16 @@ class AzadCore:
                 producedAnswers.append(None)
                 if processes[i].exitcode == ExitCodeTLE:
                     verdicts.append(SolutionCategory.TLE)
+                elif processes[i].exitcode == ExitCodeMLE:
+                    verdicts.append(SolutionCategory.MLE)
                 else:
+                    self.logger.debug(
+                        "Solution '%s' got FAIL - exited with exitcode %d:\n%s" %
+                        (sourceFilePath.parts[-1], processes[i].exitcode,
+                         processes[i].raisedTraceback))
                     verdicts.append(SolutionCategory.FAIL)
+            processes[i].close()
+            gc.collect()
             self.logger.debug("Solution '%s' got %s at test #%d." %
                               (sourceFilePath.parts[-1],
                                verdicts[-1].value.upper(), i + 1))
@@ -425,20 +454,11 @@ class AzadCore:
         self.logger.info("Solution '%s' verdict: %s" %
                          (sourceFilePath.parts[-1],
                           {key.value.upper(): verdictCounts[key]
-                              for key in verdictCounts}))
-        nonACPriorities = [
-            SolutionCategory.FAIL, SolutionCategory.WA, SolutionCategory.TLE]
-        for verdict in nonACPriorities:
-            if verdictCounts[verdict] > 0:
-                actualCategory = verdict
-                break
-        else:
-            actualCategory = SolutionCategory.AC
-
-        # Return
-        if actualCategory is not intendedCategory:
+                              for key in verdictCounts}), maxlen=500)
+        if not validateVerdict(verdictCounts, intendedCategories):
             raise WrongSolutionFileCategory(
-                sourceFilePath, intendedCategory, actualCategory)
+                "Solution '%s' failed verdict validation." %
+                (sourceFilePath,))
         return producedAnswers
 
         # Return produced answers
@@ -482,7 +502,7 @@ class AzadCore:
         if not self.producedAnswers:
             self.logger.warn("Answer is not produced yet. Producing first..")
             self.producedAnswers = self.executeSolution(
-                self.solutions[SolutionCategory.AC][0], SolutionCategory.AC, mainAC=True)
+                self.solutions[(SolutionCategory.AC,)][0], SolutionCategory.AC, mainAC=True)
             if not self.producedAnswers:
                 raise AzadError("Answer data cannot be produced")
         i = 0
@@ -498,15 +518,16 @@ class AzadCore:
         """
         Check all solution files.
         """
-        if not self.solutions[SolutionCategory.AC]:
+        if not self.solutions[(SolutionCategory.AC,)]:
             raise AzadError("There is no AC solution")
         self.logger.info("Checking all solution files..")
         self.producedAnswers = self.executeSolution(
-            self.solutions[SolutionCategory.AC][0], SolutionCategory.AC, mainAC=True)
-        for filePath in self.solutions[SolutionCategory.AC][1:]:
+            self.solutions[(SolutionCategory.AC,)][0], SolutionCategory.AC, mainAC=True)
+        for filePath in self.solutions[(SolutionCategory.AC,)][1:]:
             self.executeSolution(filePath, SolutionCategory.AC)
-        for category in SolutionCategory:
-            if category is SolutionCategory.AC:
+        for intendedCategories in self.solutions:
+            if intendedCategories == (SolutionCategory.AC,):
                 continue
-            for filePath in self.solutions[category]:
-                self.executeSolution(filePath, category)
+            else:
+                for filePath in self.solutions[intendedCategories]:
+                    self.executeSolution(filePath, intendedCategories)

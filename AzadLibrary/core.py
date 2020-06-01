@@ -11,7 +11,9 @@ import os
 from pathlib import Path
 import importlib.util
 import typing
+import time
 import atexit
+import gc
 
 # Azad libraries
 from .constants import (
@@ -19,16 +21,25 @@ from .constants import (
     DefaultFloatPrecision, DefaultIOPath,
     DefaultInputSyntax, DefaultOutputSyntax,
     DefaultTimeLimit, DefaultMemoryLimit,  # Limits
-    IODataTypesInfo, DefaultTypeStrings,  # IO data types
-    SolutionCategory, SourceFileLanguage,  # Source file related
+    IODataTypesInfo, DefaultTypeStrings, MaxParameterDimensionAllowed,  # IO data types
+    SolutionCategory, SourceFileLanguage, SourceFileType,  # Source file related
+    ExitCodeSuccess, ExitCodeTLE, ExitCodeMLE,
+    ExitCodeFailGeneral, ExitCodeFailedInAVPhase, ExitCodeFailedToReturnData,  # Exit codes
 )
 from .errors import (
-    AzadError, FailedDataValidation, NotSupportedExtension,
-    WrongSolutionFileCategory, VersionError
+    AzadError, FailedDataValidation, FailedDataGeneration,
+    NotSupportedExtension, WrongSolutionFileCategory,
+    VersionError, AzadTLE
 )
-from .path import (getExtension, getSourceFileLanguage)
+from .externalmodule import (
+    getExtension, getSourceFileLanguage,
+    prepareModule_old, prepareExecFunc,
+)
+from .process import (
+    AzadProcessGenerator, AzadProcessSolution, AzadProcessValidator,
+)
 from .iodata import (
-    cleanIOFilePath, YBMBizeData,
+    cleanIOFilePath, PGizeData,
     checkDataType, checkDataCompatibility,
     compareAnswers
 )
@@ -38,7 +49,7 @@ from .syntax import (
     cleanGenscript, generatorNamePattern,
     inputFilePattern, outputFilePattern,
 )
-from .misc import (longEndSkip,)
+from .misc import (longEndSkip, validateVerdict)
 
 
 class AzadCore:
@@ -88,8 +99,16 @@ class AzadCore:
 
         # Limits (Memory limit is currently unused)
         self.logger.debug("Validating limits and real number precision..")
-        self.limits = {"time": float(parsedConfig["limits"]["time"]), "memory": int(
-            parsedConfig["limits"]["memory"])}
+        self.limits = {
+            "time": float(parsedConfig["limits"]["time"]),
+            "memory": float(parsedConfig["limits"]["memory"])}
+        if self.limits["memory"] < 512:
+            self.logger.warn(
+                "Too low memory limit %gMB detected. MemoryError may be raised from some module imports." %
+                (self.limits["memory"],))
+        elif self.limits["memory"] > (4096):
+            self.logger.warn(
+                "Very large memory limit %gMB detected." % (self.limits["memory"],))
 
         # Floating point precision
         self.floatPrecision = float(parsedConfig["precision"]) \
@@ -113,6 +132,9 @@ class AzadCore:
             elif varType not in IODataTypesInfo:
                 raise ValueError("Parameter %s's type is invalid type '%s'" %
                                  (varName, varType))
+            elif not (0 <= dimension <= MaxParameterDimensionAllowed):
+                raise ValueError("Invalid dimension %d for parameter %s given" %
+                                 (dimension, varName))
             self.parameters[varName] = {
                 "order": addedParameters, "type": varType, "dimension": dimension}
             addedParameters += 1
@@ -127,8 +149,8 @@ class AzadCore:
             raise ValueError(
                 "Return value type '%s' is invalid" % (returnVarType,))
         returnDimension = int(parsedConfig["return"]["dimension"])
-        self.returnValue = {"type": returnVarType,
-                            "dimension": returnDimension}
+        self.returnValueInfo = {"type": returnVarType,
+                                "dimension": returnDimension}
 
         # I/O files
         self.logger.debug("Validating I/O file path..")
@@ -156,21 +178,31 @@ class AzadCore:
                 "Output file syntax '%s' doesn't match syntax" %
                 (self.outputFilePathSyntax,))
 
+        # Pick category from word ac/wa/tle/mle/fail
+        def pickCategory(word: str) -> SolutionCategory:
+            for category in SolutionCategory:
+                if category.value == word:
+                    return category
+            else:
+                raise ValueError("No matching category for word %s" % (word,))
+
         # Solution files
         self.logger.debug("Validating solution files..")
         self.solutions = {}
-        for category in SolutionCategory:
-            if category.value not in parsedConfig["solutions"]:
-                self.solutions[category] = []
-            else:
-                self.solutions[category] = [
-                    self.configDirectory / v for v in parsedConfig["solutions"][category.value]]
-                for p in self.solutions[category]:
-                    if not p.is_file():
-                        raise FileNotFoundError(
-                            "Solution '%s'(%s) is not a file" % (p, category.value))
-        if not self.solutions[SolutionCategory.AC]:
-            self.logger.warn("There is no AC solution.")
+        for key in parsedConfig["solutions"]:
+            thisCategories = tuple(
+                pickCategory(word.upper()) for word in sorted(set(key.split("/"))))
+            if thisCategories not in self.solutions:
+                self.solutions[thisCategories] = []
+            for value in parsedConfig["solutions"][key]:
+                thisPath: Path = self.configDirectory / value
+                self.solutions[thisCategories].append(thisPath)
+                if not thisPath.is_file():
+                    raise FileNotFoundError(
+                        "Solution '%s'(%s) is not a file" %
+                        (thisPath, ",".join(c.value.upper() for c in thisCategories)))
+        if (SolutionCategory.AC,) not in self.solutions:
+            self.logger.warn("There is no AC-only solution.")
 
         # Generators
         self.logger.debug("Validating generator files..")
@@ -224,281 +256,217 @@ class AzadCore:
         del self.inputDatas
         # self.logger.terminate()  # Log file will be auto terminated
 
-    @staticmethod
-    def prepareModule(sourceFilePath: typing.Union[str, Path],
-                      moduleName: str):
-        """
-        Prepare module from given file name.
-        """
-        # Get filename extension
-        fileExtension = getExtension(sourceFilePath)
-        sourceLanguage = getSourceFileLanguage(sourceFilePath)
-
-        # Extension case handling
-        if sourceLanguage is SourceFileLanguage.Python3:
-            spec = importlib.util.spec_from_file_location(
-                moduleName, sourceFilePath)
-            thisModule = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(thisModule)
-            return thisModule
-        else:
-            raise NotImplementedError(
-                "Extension '%s' is not supported" % (fileExtension,))
-
     def executeValidator(
             self, sourceFilePath: typing.Union[str, Path], data=None):
         """
         Execute sourcefile as validator by given file name.
         Validate input file.
         """
-
         # Generate data, if not available
         if data is None:
             if not self.inputDatas:
-                self.inputDatas = self.generateInput()
+                self.inputDatas = self.generateInput(validate=False)
             data = self.inputDatas
 
-        # Pop validator function
-        validation = None
-        sourceModule = AzadCore.prepareModule(sourceFilePath, "validator")
-        sourceLanguage = getSourceFileLanguage(sourceFilePath)
-        if sourceLanguage is SourceFileLanguage.Python3:
-            validation = sourceModule.validate
-        else:
-            raise NotSupportedExtension(getExtension(sourceFilePath))
-        if not validation:
-            raise AzadError(
-                "Validation function is invalid in '%s'" %
-                (sourceFilePath,))
+        # Run multiprocessing
+        startTime = time.perf_counter()
+        processes = [
+            AzadProcessValidator(
+                sourceFilePath,
+                args=[deepcopy(data[i][varName])
+                      for varName in self.parameterNamesSorted],
+                timelimit=5.0, memlimit=256,
+            ) for i in range(len(data))
+        ]
+        for i in range(len(data)):
+            self.logger.debug("Validation process #%d started.." % (i + 1,))
+            processes[i].start()
+        for i in range(len(data)):
+            self.logger.info("Waiting validation process #%d.." % (i + 1,))
+            processes[i].join()
 
-        # Validate input
-        self.logger.info("Validating input by '%s'.." % (sourceFilePath,))
-        i = 0
-        for inputData in data:
-            i += 1
-            self.logger.info("Validating %d-th input.." % (i,))
-            try:
-                validation(*[deepcopy(inputData[varName])
-                             for varName in self.parameterNamesSorted])
-            except Exception as err:
+        # Analyze results
+        for i in range(len(data)):
+            self.logger.debug("Analyzing validation process #%d.." % (i + 1,))
+            if processes[i].exitcode == ExitCodeSuccess:
+                self.logger.debug("Ok, validation passed.")
+            elif processes[i].exitcode == ExitCodeTLE:
+                raise AzadTLE("Validation process #%d got TLE" % (i + 1,))
+            elif processes[i].exitcode == ExitCodeFailGeneral:
                 self.logger.error(
-                    "Validation failed at %d-th input. (%s)" %
-                    (i, type(err)))
-                if err.args:
-                    self.logger.error("Detail log: \"%s\"" %
-                                      (" ".join(err.args),))
-                raise FailedDataValidation().with_traceback(err.__traceback__)
+                    "Validation process #%d raised an error:\n%s" %
+                    (i + 1, processes[i].raisedTraceback), maxlen=2000)
+                raise FailedDataValidation
             else:
-                self.logger.debug("Validated %d-th input." % (i,))
-
-    def executeGenerator(
-            self, sourceFilePath: typing.Union[str, Path], args: typing.Tuple[str]) -> dict:
-        """
-        Execute generator with given arguments. args is tuple of strings.
-        You have to make function `generate(args: string[])` to generate data.
-        Generator's return value form should be `{variable name: content}`.
-        """
-        # Prepare module
-        generateModule = AzadCore.prepareModule(sourceFilePath, "generator")
-        genFunc = None
-        sourceLanguage = getSourceFileLanguage(sourceFilePath)
-        if sourceLanguage is SourceFileLanguage.Python3:
-            genFunc = generateModule.generate
-        else:
-            fileExtension = getExtension(sourceFilePath)
-            raise NotSupportedExtension(fileExtension)
-        if not genFunc:
-            raise FailedDataValidation("Generating function is invalid")
-
-        # Execution
-        hashValue = hashlib.sha256("|".join(args).encode()).hexdigest()
-        random.seed(hashValue)
-        self.logger.debug("Executing genscript '%s' on '%s', hash = '%s..'" %
-                          (" ".join(args), sourceFilePath.name, longEndSkip(hashValue, 20)))
-        result = genFunc(args)
-        self.logger.debug("Result is %s" % (result,), maxlen=500)
-
-        # Analyze execution result
-        if not isinstance(result, dict):
-            raise FailedDataValidation("Generator '%s' generated %s instead of dict" %
-                                       (sourceFilePath, type(result),))
-        elif set(result.keys()) != set(self.parameters.keys()):
-            raise FailedDataValidation("Generator '%s' generated different parameters (%s)" %
-                                       (sourceFilePath, ", ".join(result.keys()),))
-        self.logger.debug(
-            "Validating generated data's parameter types and compatibility..")
-        for name in result:
-            if not checkDataType(result[name], self.parameters[name]["type"],
-                                 self.parameters[name]["dimension"], variableName=name):
                 raise FailedDataValidation(
-                    "Generator '%s' generated wrong type for parameter %s on args %s" %
-                    (sourceFilePath, name, args))
-            elif not checkDataCompatibility(result[name], self.parameters[name]["type"]):
-                raise FailedDataValidation(
-                    "Generator '%s' generated incompatible %s data for parameter %s on args %s" %
-                    (sourceFilePath, self.parameters[name]["type"], name, args))
-        return result
+                    "Validation process #%d with unknown reason (Exit code %d)" %
+                    (i + 1, processes[i].exitcode))
+            processes[i].close()
+            gc.collect()
 
-    def generateInput(self) -> list:
+        # Check performance
+        endTime = time.perf_counter()
+        self.logger.info(
+            "Validated all data in %g seconds." % (endTime - startTime,))
+
+    def generateInput(self, validate: bool = True) -> list:
         """
         Generate all input data and return.
         """
         if not self.genScripts:
             raise ValueError("There is no genscript")
         self.logger.info("Generating input data..")
+        startTime = time.perf_counter()
 
-        # Execute gen scripts:
-        # Suppose all genscript lines are validated in __init__.
-        result = []
-        i = 0
-        for script in self.genScripts:
-            elements = script.split(" ")
+        # Execute genscripts with multiprocessing.
+        # Suppose all genscript lines are validated before.
+        processes = []
+        for i in range(len(self.genScripts)):
+            genscript = self.genScripts[i]
+            elements = genscript.split(" ")
             genFilePath = self.generators[elements[0]]
-            i += 1
-            self.logger.info("Generating input data #%d.." % (i,))
-            result.append(self.executeGenerator(genFilePath, elements[1:]))
+            args = elements[1:]
+            self.logger.debug("Starting generation process #%d, genscript = '%s'.." %
+                              (i + 1, genscript))
+            processes.append(AzadProcessGenerator(
+                genFilePath, args, self.parameters, timelimit=10.0, memlimit=1024))
+            processes[-1].start()
+        for i in range(len(self.genScripts)):
+            self.logger.info("Waiting generation process #%d.." % (i + 1,))
+            processes[i].join()
 
-        # If no data produced then raise error
-        if not result:
-            raise FailedDataValidation("No input data generated")
-        else:
-            if self.validator:
-                self.executeValidator(self.validator, result)
-            return result
+        # Analyze results
+        result = []
+        for i in range(len(self.genScripts)):
+            self.logger.debug("Analyzing generation process #%d.." % (i + 1,))
+            if processes[i].exitcode == ExitCodeSuccess:
+                result.append(processes[i].returnedValue)
+            elif processes[i].exitcode == ExitCodeFailedInAVPhase:
+                self.logger.error(
+                    "Generation process #%d generated wrong data:\n%s" %
+                    (i + 1, processes[i].raisedTraceback), maxlen=2000)
+                raise FailedDataGeneration
+            elif processes[i].exitcode == ExitCodeTLE:
+                raise FailedDataGeneration(
+                    "Generation process #%d got TLE" % (i + 1,))
+            elif processes[i].exitcode == ExitCodeMLE:
+                raise FailedDataGeneration(
+                    "Generation process #%d got MLE" % (i + 1,))
+            elif processes[i].exitcode == ExitCodeFailGeneral:
+                self.logger.error(
+                    "Generation process #%d raised an exception during generation:\n%s" %
+                    (i + 1, processes[i].raisedTraceback), maxlen=2000)
+                raise FailedDataGeneration
+            else:
+                raise FailedDataGeneration(
+                    "Generation process #%d failed with unknown reason (Exit code %d)" %
+                    (i + 1, processes[i].exitcode))
+            processes[i].close()
+            gc.collect()
+
+        # Check performance
+        endTime = time.perf_counter()
+        self.logger.info(
+            "Generated all data in %g seconds." % (endTime - startTime,))
+
+        # If there is an validator then validate it
+        if self.validator and validate:
+            self.executeValidator(self.validator, result)
+        return result
 
     def executeSolution(self, sourceFilePath: typing.Union[str, Path],
-                        intendedCategory: SolutionCategory = SolutionCategory.AC,
+                        intendedCategories: typing.List[SolutionCategory]
+                        = (SolutionCategory.AC,),
                         mainAC: bool = False) -> list:
         """
         Execute sourcefile as solution by given file name.
         Validate result and category, and return produced answers.
+        If `mainAC` is True, then doesn't check answers and just return.
         """
 
         # Validate parameters
-        if sourceFilePath not in self.solutions[intendedCategory]:
+        if isinstance(intendedCategories, SolutionCategory):
+            intendedCategories = (intendedCategories,)
+        elif not isinstance(intendedCategories, (list, tuple)):
+            raise TypeError("Invalid type %s given for category" %
+                            (type(intendedCategories),))
+        if intendedCategories != (SolutionCategory.AC,) and mainAC:
+            raise ValueError("Category is %s but mainAC is True" %
+                             (",".join(c.value.upper() for c in intendedCategories)))
+        if sourceFilePath not in self.solutions[intendedCategories]:
             self.logger.warn(
                 "You are trying to execute non-registered solution file '%s' (%s)" %
-                (sourceFilePath, intendedCategory.value))
-        if not isinstance(intendedCategory, SolutionCategory):
-            raise TypeError("Invalid type %s given for category" %
-                            (type(intendedCategory),))
-        elif intendedCategory is not SolutionCategory.AC and mainAC:
-            raise ValueError("Category is %s but mainAC is True" %
-                             (intendedCategory.value,))
+                (sourceFilePath, ",".join(c.value.upper() for c in intendedCategories)))
 
         # Generate data. If input data is empty, then generation is forced.
         if not self.inputDatas:
-            self.inputDatas = self.generateInput()
+            self.inputDatas = self.generateInput(validate=True)
 
-        # Pop solution functions
-        solution = None
-        sourceModule = AzadCore.prepareModule(sourceFilePath, "submission")
-        sourceLanguage = getSourceFileLanguage(sourceFilePath)
-        if sourceLanguage is SourceFileLanguage.Python3:
-            solution = sourceModule.solution
-        else:
-            raise NotSupportedExtension(getExtension(sourceFilePath))
-        if not solution:
-            raise AzadError("Solution function is invalid in '%s'" %
-                            (sourceFilePath,))
-
-        # Actual invocation
-        self.logger.info(
-            "Executing solution '%s' for %s.." %
-            (sourceFilePath, intendedCategory.value.upper() + (" (MAIN)" if mainAC else "")))
-        varNamesSorted = list(self.parameters.keys())
-        varNamesSorted.sort(key=lambda x: self.parameters[x]["order"])
+        # Do multiprocessing
+        self.logger.info("Analyzing solution '%s'.." % (sourceFilePath,))
+        startTime = time.perf_counter()
+        verdicts = []
         producedAnswers = []
-        verdicts = [None for _ in range(len(self.inputDatas))]
-        i = 0
-        for inputData in self.inputDatas:
-            i += 1
-            self.logger.info("Running %d-th test case.." % (i,))
-            try:
-                result = solution(*[deepcopy(inputData[varName])
-                                    for varName in varNamesSorted])
-                if not checkDataType(
-                        result, self.returnValue["type"],
-                        self.returnValue["dimension"], "return value"):
-                    raise FailedDataValidation(
-                        "Solution %s generated wrong type of data on %d-th testcase" %
-                        (sourceFilePath, i))
-                elif not checkDataCompatibility(result, self.returnValue["type"]):
-                    raise FailedDataValidation(
-                        "Solution %s generated incompatible %s data on %d-th testcase" %
-                        (sourceFilePath, self.returnValue["type"], i))
-
-            except (TimeoutError, MemoryError, RuntimeError, FailedDataValidation) as err:  # Error raised
-                actualCategory = SolutionCategory.FAIL
-                if isinstance(err, TimeoutError):
-                    actualCategory = SolutionCategory.TLE
-                elif isinstance(err, MemoryError):
-                    # Memory error is not supported, but accepted
-                    pass
-                else:  # General error
-                    pass
-                verdicts[i - 1] = actualCategory
-
-                # Case handling
-                if mainAC:
-                    raise AzadError(
-                        "Main AC solution got %s" % (actualCategory.value.upper(),))
+        processes = [AzadProcessSolution(
+            sourceFilePath, self.returnValueInfo,
+            args=deepcopy([self.inputDatas[i][varName]
+                           for varName in self.parameterNamesSorted]),
+            timelimit=self.limits["time"], memlimit=self.limits["memory"]
+        ) for i in range(len(self.inputDatas))]
+        for i in range(len(self.inputDatas)):
+            self.logger.debug("Starting solution process #%d.." % (i + 1,))
+            processes[i].start()
+        for i in range(len(self.inputDatas)):
+            self.logger.info("Waiting solution process #%d.." % (i + 1,))
+            processes[i].join()
+        for i in range(len(self.inputDatas)):
+            self.logger.debug("Analyzing solution process #%d.." % (i + 1,))
+            if processes[i].exitcode == ExitCodeSuccess:
+                # I will implement customized checker,
+                # this is why I separated answer checking from multiprocessing.
+                thisAnswer = processes[i].returnedValue
+                producedAnswers.append(thisAnswer)
+                if mainAC or compareAnswers(
+                        self.producedAnswers[i], thisAnswer,
+                        floatPrecision=self.floatPrecision):
+                    verdicts.append(SolutionCategory.AC)
+                else:
+                    verdicts.append(SolutionCategory.WA)
+            else:
+                producedAnswers.append(None)
+                if processes[i].exitcode == ExitCodeTLE:
+                    verdicts.append(SolutionCategory.TLE)
+                elif processes[i].exitcode == ExitCodeMLE:
+                    verdicts.append(SolutionCategory.MLE)
                 else:
                     self.logger.debug(
-                        "Solution '%s' got %s on test #%d, which is intended." %
-                        (sourceFilePath, intendedCategory.value.upper(), i))
+                        "Solution '%s' got FAIL - exited with exitcode %d:\n%s" %
+                        (sourceFilePath.parts[-1], processes[i].exitcode,
+                         processes[i].raisedTraceback))
+                    verdicts.append(SolutionCategory.FAIL)
+            processes[i].close()
+            gc.collect()
+            self.logger.debug("Solution '%s' got %s at test #%d." %
+                              (sourceFilePath.parts[-1],
+                               verdicts[-1].value.upper(), i + 1))
 
-                # Add dummy value anyway
-                producedAnswers.append(None)
-
-            else:  # Produced data well. Check return data type.
-                producedAnswers.append(result)
-
-        # Do job with total produced answers
-        if not mainAC:
-
-            # Iterate over answer comparisons
-            for i in range(len(producedAnswers)):
-                if verdicts[i] is not None and producedAnswers[i] is None:  # Already verdicted
-                    continue
-                self.logger.debug(
-                    "Comparing %d-th produced answer.. (%s vs %s)" %
-                    (i + 1, self.producedAnswers[i], producedAnswers[i]))
-                gotAC = compareAnswers(
-                    self.producedAnswers[i], producedAnswers[i],
-                    floatPrecision=self.floatPrecision)
-                self.logger.debug("Verdict is %s" % ("AC" if gotAC else "WA",))
-                verdicts[i] = SolutionCategory.AC if gotAC else SolutionCategory.WA
-            verdictCount = {
-                intendedCategory: 0 for intendedCategory in SolutionCategory}
-            for verdict in verdicts:
-                verdictCount[verdict] += 1
-            self.logger.debug("Solution '%s' (Intended to be %s): %s" %
-                              (sourceFilePath, intendedCategory.value.upper(),
-                               ", ".join("%d %s" % (verdictCount[verdict], verdict.value.upper()) for verdict in verdictCount)))
-
-            # Validate total result.
-            # intendedCategory is already validated before.
-            actualVerdict: SolutionCategory = None
-            if verdictCount[SolutionCategory.AC] == len(producedAnswers):
-                actualVerdict = SolutionCategory.AC
-            elif verdictCount[SolutionCategory.FAIL] > 0:
-                actualVerdict = SolutionCategory.FAIL
-            elif verdictCount[SolutionCategory.WA] == 0:
-                actualVerdict = SolutionCategory.TLE
-            else:
-                actualVerdict = SolutionCategory.WA
-            if actualVerdict != intendedCategory:
-                raise WrongSolutionFileCategory(
-                    sourceFilePath, intendedCategory, actualVerdict)
-            else:
-                self.logger.info(
-                    "Solution '%s' worked as intended %s." %
-                    (sourceFilePath, intendedCategory.value.upper()))
-
-        else:  # If mainAC is True, then automatically copy producedAnswers.
-            self.logger.debug("Making produced answers as official..")
-            self.producedAnswers = producedAnswers
+        # Validate verdicts
+        endTime = time.perf_counter()
+        self.logger.info(
+            "Executed solution for all data in %g seconds." %
+            (endTime - startTime,))
+        self.logger.info("Answers = %s" % (producedAnswers,))
+        verdictCounts = {category: verdicts.count(category)
+                         for category in SolutionCategory}
+        self.logger.info("Solution '%s' verdict: %s" %
+                         (sourceFilePath.parts[-1],
+                          {key.value.upper(): verdictCounts[key]
+                              for key in verdictCounts}), maxlen=500)
+        if not validateVerdict(verdictCounts, intendedCategories):
+            raise WrongSolutionFileCategory(
+                "Solution '%s' failed verdict validation." %
+                (sourceFilePath,))
+        return producedAnswers
 
         # Return produced answers
         return producedAnswers
@@ -524,7 +492,7 @@ class AzadCore:
                     "Writing %d-th input file '%s'.." %
                     (i, inputFile.name))
                 inputFile.write(",".join(
-                    YBMBizeData(data[name], self.parameters[name]["type"])
+                    PGizeData(data[name], self.parameters[name]["type"])
                     for name in self.parameterNamesSorted))
 
     def makeOutputFiles(self, outputFileSyntax: str = None):
@@ -541,7 +509,7 @@ class AzadCore:
         if not self.producedAnswers:
             self.logger.warn("Answer is not produced yet. Producing first..")
             self.producedAnswers = self.executeSolution(
-                self.solutions[SolutionCategory.AC][0], SolutionCategory.AC, mainAC=True)
+                self.solutions[(SolutionCategory.AC,)][0], SolutionCategory.AC, mainAC=True)
             if not self.producedAnswers:
                 raise AzadError("Answer data cannot be produced")
         i = 0
@@ -551,21 +519,22 @@ class AzadCore:
                 self.logger.debug(
                     "Writing %d-th output file '%s'.." %
                     (i, outputFile.name))
-                outputFile.write(YBMBizeData(data, self.returnValue["type"]))
+                outputFile.write(PGizeData(data, self.returnValueInfo["type"]))
 
     def checkAllSolutionFiles(self):
         """
         Check all solution files.
         """
-        if not self.solutions[SolutionCategory.AC]:
+        if not self.solutions[(SolutionCategory.AC,)]:
             raise AzadError("There is no AC solution")
         self.logger.info("Checking all solution files..")
-        self.executeSolution(
-            self.solutions[SolutionCategory.AC][0], SolutionCategory.AC, mainAC=True)
-        for filePath in self.solutions[SolutionCategory.AC][1:]:
+        self.producedAnswers = self.executeSolution(
+            self.solutions[(SolutionCategory.AC,)][0], SolutionCategory.AC, mainAC=True)
+        for filePath in self.solutions[(SolutionCategory.AC,)][1:]:
             self.executeSolution(filePath, SolutionCategory.AC)
-        for category in SolutionCategory:
-            if category is SolutionCategory.AC:
+        for intendedCategories in self.solutions:
+            if intendedCategories == (SolutionCategory.AC,):
                 continue
-            for filePath in self.solutions[category]:
-                self.executeSolution(filePath, category)
+            else:
+                for filePath in self.solutions[intendedCategories]:
+                    self.executeSolution(filePath, intendedCategories)

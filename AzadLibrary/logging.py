@@ -3,6 +3,7 @@ This module is used to manage log.
 """
 
 # Standard libraries
+from math import inf
 import atexit
 from datetime import datetime, timedelta
 import warnings
@@ -79,10 +80,14 @@ class Logger:
         if not self.activated:
             return
 
-        # Validate log-ability
-        if maxlen < 4:
+        # Validate maxlen
+        if maxlen is None:
+            maxlen = inf
+        elif maxlen < 20:
             raise ValueError("Invalid maxlen %d" % (maxlen,))
-        elif self.mainLogFile.closed:
+
+        # Validate logability
+        if self.mainLogFile.closed:
             warnings.warn(
                 "Tried logging when main logfile is already closed. This log is dismissed.")
             return

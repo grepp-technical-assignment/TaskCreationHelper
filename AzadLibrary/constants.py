@@ -1,5 +1,6 @@
 """
 This module contains various constants for Azad library.
+This module should not import any other part of Azad library.
 """
 
 # Standard libraries
@@ -16,8 +17,9 @@ DefaultFloatPrecision = 1e-3
 DefaultIOPath = "IO"
 DefaultInputSyntax = "%02d.in.txt"
 DefaultOutputSyntax = "%02d.out.txt"
-DefaultTimeLimit = 10.0  # seconds
-DefaultMemoryLimit = 256  # megabytes; Not used
+DefaultTimeLimit = 5.0  # seconds
+DefaultMemoryLimit = 1024  # megabytes; Not used
+MaxParameterDimensionAllowed = 2
 
 
 # Default typestring for all accepted types.
@@ -121,10 +123,11 @@ class SolutionCategory(Enum):
     """
     Enumeration of possible solution file status.
     """
-    AC = "ac"
-    WA = "wa"
-    TLE = "tle"
-    FAIL = "fail"
+    AC = "AC"
+    WA = "WA"
+    TLE = "TLE"
+    MLE = "MLE"
+    FAIL = "FAIL"
 
 
 # Category of source file languages
@@ -183,3 +186,31 @@ class LogLevel(Enum):
     Warn = "Warn"
     Info = "Info"
     Debug = "Debug"
+
+
+# List of exit codes for multiprocessing
+ExitCodeSuccess = 0
+ExitCodeFailGeneral = 32
+ExitCodeTLE = 33
+ExitCodeMLE = 34
+ExitCodeFailedToReturnData = 35
+ExitCodeFailedInAVPhase = 36  # Failed in after-validation phase
+
+
+# Target types for primitive data protocol
+PrimitiveDataProtocolTargetTypes = typing.Union[
+    int, float, bool, None,
+    str, bytes, bytearray,
+    list, tuple, set, frozenset,
+    dict
+]
+
+
+# Sourcefile Types
+class SourceFileType(Enum):
+    """
+    Enumeration of source file types.
+    """
+    Generator = "generator"
+    Validator = "validator"
+    Solution = "solution"

@@ -1,20 +1,21 @@
-# Standard libraries
-import typing
-from copy import deepcopy
-import json
-import re
-import os
-from sys import argv
-from pathlib import Path
-import warnings
-import atexit
-
-# Azad library
-from AzadLibrary import AzadCore, StartingConfigState
-from AzadLibrary.misc import barLine
-
-# Execution
+# Main Execution
 if __name__ == "__main__":
+
+    # Standard libraries
+    import typing
+    from copy import deepcopy
+    import json
+    import re
+    import os
+    from sys import argv
+    from pathlib import Path
+    import warnings
+    import atexit
+
+    # Azad library
+    from AzadLibrary import AzadCore, StartingConfigState
+    from AzadLibrary.misc import barLine
+
     subcommand = argv[1] if len(argv) > 1 else "help"
     print(barLine("Azad Library"))
     atexit.register(print, barLine("Azad Library Termination"))
@@ -92,4 +93,5 @@ List of subcommands:
             (subcommand,))
 
 else:
-    warnings.warn("run.py should not be included by other modules")
+    # warnings.warn("run.py should not be included by other modules")
+    pass

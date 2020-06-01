@@ -1,6 +1,6 @@
 # Task Creation Helper
 
-This repository is made by Azad to make task creation process easier in [YBM Business Programmers platform](https://ybm-business.programmers.co.kr/). 
+This repository is made by Azad to make task creation process easier in [Business Programmers platform](https://business.programmers.co.kr/). 
 I strongly recommend you to use Visual Studio Code for convenience, but you can use other IDEs as well.
 
 # Features
@@ -8,13 +8,13 @@ I strongly recommend you to use Visual Studio Code for convenience, but you can 
 - Maintanence of parameter/return type and dimension
 - Data generation with generator and genscript
 - Source file validation (Python3)
-- Automated I/O file generation (YBM style formatted)
+- Automated I/O file generation (Programmers style formatted)
 
 # Dependencies
 
 * Python 3.8.3+
-* direnv
-* pyenv
+  * autopep8
+* Warning: WSL 1 is **not safe** to use this library due to [lack of resource management](https://github.com/microsoft/WSL/issues/4509).
 
 # Usage
 
@@ -34,16 +34,17 @@ In `config.json`, you can maintain following things:
 
 - Parameters and return value's variable type
   - Each parameter will have 3 options - variable name, type and dimension.
-- Time and memory limit (Memory limit is currently unsupported)
+- Time and memory limit
 - Solution files: List of solution files are here. Those are classified by following categories.
   - AC: Official solution. This should pass all test cases. Especially, the first AC solution will generate all answer data.
   - WA: Wrong Answer. This should return wrong answer at least one of test cases.
   - FAIL: This should fail(with any reason, including timeout and system fails) at least one of test cases.
   - TLE: This should exceed time limit at least one of test cases.
+  - MLE: This should exceed memory limit at least one of test cases.
 - Generator files: List of generator files are here. Each generator should have own name, which will be used in `genscript`.
 - Generator script(`genscript`): This is the script to use generate input data with generators. Comments are also supported.
 - I/O file storage directory
-- Input validator
+- Input validator files
 
 Initialize problem folder with Azad library, then you will get sample configuration json file in that problem folder.
 
@@ -51,7 +52,6 @@ Initialize problem folder with Azad library, then you will get sample configurat
 
 These are currently unsupported, but targetted to be supported in future.
 
+- File system to manage temporary files with safety
 - Customized answer checker
-- Applying Time/Memory limit on solution file execution
 - Cross language sourcefile execution(C++, Java, etc)
-

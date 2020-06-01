@@ -41,8 +41,9 @@ def longEndSkip(message: str, maxLength: int = 100) -> str:
 def randomName(length: int):
     """
     Return random name using English letters and numbers.
+    Remind that calling this will reset random seed to arbitrary number.
     """
-    random.seed(time.time_ns())
+    random.seed(time.monotonic_ns())
     alphabets = "abcdefghijklmnopqrstuvwxyz"
     numbers = "0123456789"
     candidates = alphabets.lower() + alphabets.upper() + numbers

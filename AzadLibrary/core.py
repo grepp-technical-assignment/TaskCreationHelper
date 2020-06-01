@@ -101,7 +101,14 @@ class AzadCore:
         self.logger.debug("Validating limits and real number precision..")
         self.limits = {
             "time": float(parsedConfig["limits"]["time"]),
-            "memory": int(parsedConfig["limits"]["memory"])}
+            "memory": float(parsedConfig["limits"]["memory"])}
+        if self.limits["memory"] < 512:
+            self.logger.warn(
+                "Too low memory limit %gMB detected. MemoryError may be raised from some module imports." %
+                (self.limits["memory"],))
+        elif self.limits["memory"] > (4096):
+            self.logger.warn(
+                "Very large memory limit %gMB detected." % (self.limits["memory"],))
 
         # Floating point precision
         self.floatPrecision = float(parsedConfig["precision"]) \

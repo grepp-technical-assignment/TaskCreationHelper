@@ -17,8 +17,8 @@ DefaultFloatPrecision = 1e-3
 DefaultIOPath = "IO"
 DefaultInputSyntax = "%02d.in.txt"
 DefaultOutputSyntax = "%02d.out.txt"
-DefaultTimeLimit = 10.0  # seconds
-DefaultMemoryLimit = 256  # megabytes; Not used
+DefaultTimeLimit = 5.0  # seconds
+DefaultMemoryLimit = 1024  # megabytes; Not used
 MaxParameterDimensionAllowed = 2
 
 

@@ -23,8 +23,9 @@ from .constants import (
     DefaultTimeLimit, DefaultMemoryLimit,  # Limits
     IODataTypesInfo, DefaultTypeStrings, MaxParameterDimensionAllowed,  # IO data types
     SolutionCategory, SourceFileLanguage, SourceFileType,  # Source file related
-    ExitCodeSuccess, ExitCodeTLE, ExitCodeMLE,
-    ExitCodeFailGeneral, ExitCodeFailedInAVPhase, ExitCodeFailedToReturnData,  # Exit codes
+    ExitCodeSuccess, ExitCodeTLE, ExitCodeMLE,  # Exit codes
+    ExitCodeFailedInAVPhase, ExitCodeFailedInBPPhase, ExitCodeFailedInLoopPhase,
+    ExitCodeFailedToReturnData,
 )
 from .errors import (
     AzadError, FailedDataValidation, FailedDataGeneration,
@@ -49,6 +50,7 @@ from .syntax import (
     inputFilePattern, outputFilePattern,
 )
 from .misc import (longEndSkip, validateVerdict)
+from .filesystem import TempFileSystem
 
 
 class AzadCore:
@@ -246,6 +248,9 @@ class AzadCore:
         # Reserve termination
         atexit.register(self.terminate)
 
+        # File system
+        self.tempFileSystem = TempFileSystem(self.configDirectory)
+
     def terminate(self):
         """
         Terminate.
@@ -253,7 +258,6 @@ class AzadCore:
         self.logger.info("Terminating Azad core..")
         del self.producedAnswers
         del self.inputDatas
-        # self.logger.terminate()  # Log file will be auto terminated
 
     def executeValidator(
             self, sourceFilePath: typing.Union[str, Path], data=None):
@@ -269,11 +273,16 @@ class AzadCore:
 
         # Run multiprocessing
         startTime = time.perf_counter()
+        tempInputFiles = [
+            self.tempFileSystem.newTempFile(
+                [data[i][varName] for varName in self.parameterNamesSorted],
+                isJson=True
+            ) for i in range(len(data))
+        ]
         processes = [
             AzadProcessValidator(
                 sourceFilePath,
-                args=[deepcopy(data[i][varName])
-                      for varName in self.parameterNamesSorted],
+                tempInputFiles[i],
                 timelimit=5.0, memlimit=256,
             ) for i in range(len(data))
         ]
@@ -283,6 +292,7 @@ class AzadCore:
         for i in range(len(data)):
             self.logger.info("Waiting validation process #%d.." % (i + 1,))
             processes[i].join()
+            self.tempFileSystem.pop(tempInputFiles[i])
 
         # Analyze results
         for i in range(len(data)):
@@ -290,16 +300,17 @@ class AzadCore:
             if processes[i].exitcode == ExitCodeSuccess:
                 self.logger.debug("Ok, validation passed.")
             elif processes[i].exitcode == ExitCodeTLE:
-                raise AzadTLE("Validation process #%d got TLE" % (i + 1,))
-            elif processes[i].exitcode == ExitCodeFailGeneral:
-                self.logger.error(
-                    "Validation process #%d raised an error:\n%s" %
-                    (i + 1, processes[i].raisedTraceback), maxlen=2000)
-                raise FailedDataValidation
-            else:
                 raise FailedDataValidation(
-                    "Validation process #%d with unknown reason (Exit code %d)" %
-                    (i + 1, processes[i].exitcode))
+                    "Validation process #%d got TLE" % (i + 1,))
+            elif processes[i].exitcode == ExitCodeMLE:
+                raise FailedDataValidation(
+                    "Validation process #%d got MLE" % (i + 1,))
+            else:
+                self.logger.error(
+                    "Validation process #%d failed with exit code %d:\n%s" %
+                    (i + 1, processes[i].exitcode,
+                     processes[i].raisedTraceback), maxlen=2000)
+                raise FailedDataValidation
             processes[i].close()
             gc.collect()
 
@@ -319,8 +330,10 @@ class AzadCore:
 
         # Execute genscripts with multiprocessing.
         # Suppose all genscript lines are validated before.
-        processes = []
+        tempOutFilePaths: typing.List[Path] = []
+        processes: typing.List[AzadProcessGenerator] = []
         for i in range(len(self.genScripts)):
+            tempOutFilePaths.append(self.tempFileSystem.newTempFile())
             genscript = self.genScripts[i]
             elements = genscript.split(" ")
             genFilePath = self.generators[elements[0]]
@@ -328,11 +341,15 @@ class AzadCore:
             self.logger.debug("Starting generation process #%d, genscript = '%s'.." %
                               (i + 1, genscript))
             processes.append(AzadProcessGenerator(
-                genFilePath, args, self.parameters, timelimit=10.0, memlimit=1024))
+                genFilePath, args, self.parameters,
+                outFilePath=tempOutFilePaths[i],
+                outFileExistenceToleration=True,
+                timelimit=10.0, memlimit=1024))
             processes[-1].start()
         for i in range(len(self.genScripts)):
             self.logger.info("Waiting generation process #%d.." % (i + 1,))
             processes[i].join()
+            self.tempFileSystem.pop(tempOutFilePaths[i])
 
         # Analyze results
         result = []
@@ -351,15 +368,11 @@ class AzadCore:
             elif processes[i].exitcode == ExitCodeMLE:
                 raise FailedDataGeneration(
                     "Generation process #%d got MLE" % (i + 1,))
-            elif processes[i].exitcode == ExitCodeFailGeneral:
-                self.logger.error(
-                    "Generation process #%d raised an exception during generation:\n%s" %
-                    (i + 1, processes[i].raisedTraceback), maxlen=2000)
-                raise FailedDataGeneration
             else:
-                raise FailedDataGeneration(
-                    "Generation process #%d failed with unknown reason (Exit code %d)" %
-                    (i + 1, processes[i].exitcode))
+                self.logger.error(
+                    "Generation process #%d failed with unknown reason (Exit code %d):\n%s" %
+                    (i + 1, processes[i].exitcode, processes[i].capsuleException))
+                raise FailedDataGeneration
             processes[i].close()
             gc.collect()
 
@@ -406,10 +419,13 @@ class AzadCore:
         startTime = time.perf_counter()
         verdicts = []
         producedAnswers = []
+        tempFiles = [self.tempFileSystem.newTempFile(
+            [self.inputDatas[i][varName]
+                for varName in self.parameterNamesSorted],
+            isJson=True
+        ) for i in range(len(self.inputDatas))]
         processes = [AzadProcessSolution(
-            sourceFilePath, self.returnValueInfo,
-            args=deepcopy([self.inputDatas[i][varName]
-                           for varName in self.parameterNamesSorted]),
+            sourceFilePath, tempFiles[i], self.returnValueInfo,
             timelimit=self.limits["time"], memlimit=self.limits["memory"]
         ) for i in range(len(self.inputDatas))]
         for i in range(len(self.inputDatas)):
@@ -418,6 +434,7 @@ class AzadCore:
         for i in range(len(self.inputDatas)):
             self.logger.info("Waiting solution process #%d.." % (i + 1,))
             processes[i].join()
+            self.tempFileSystem.pop(tempFiles[i])
         for i in range(len(self.inputDatas)):
             self.logger.debug("Analyzing solution process #%d.." % (i + 1,))
             if processes[i].exitcode == ExitCodeSuccess:
@@ -439,7 +456,7 @@ class AzadCore:
                     verdicts.append(SolutionCategory.MLE)
                 else:
                     self.logger.debug(
-                        "Solution '%s' got FAIL - exited with exitcode %d:\n%s" %
+                        "Solution '%s' failed with exitcode %d:\n%s" %
                         (sourceFilePath.parts[-1], processes[i].exitcode,
                          processes[i].raisedTraceback))
                     verdicts.append(SolutionCategory.FAIL)

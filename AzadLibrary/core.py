@@ -465,7 +465,7 @@ class AzadCore:
                               (sourceFilePath.parts[-1],
                                verdicts[-1].value.upper(), i + 1))
 
-        # Validate verdicts
+        # Validate verdicts and return produced answers
         endTime = time.perf_counter()
         self.logger.info(
             "Executed solution for all data in %g seconds." %
@@ -481,9 +481,6 @@ class AzadCore:
             raise WrongSolutionFileCategory(
                 "Solution '%s' failed verdict validation." %
                 (sourceFilePath,))
-        return producedAnswers
-
-        # Return produced answers
         return producedAnswers
 
     def makeInputFiles(self, inputFileSyntax: str = None):

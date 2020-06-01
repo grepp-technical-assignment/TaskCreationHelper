@@ -369,17 +369,11 @@ class AzadProcessSolution(AzadProcessForModules):
         """
         Validate if generated result is fit for target return value.
         """
-        try:
-            assert checkDataType(
-                self.capsuleResult, self.returnValueInfo["type"],
-                self.returnValueInfo["dimension"])
-            assert checkDataCompatibility(
-                self.capsuleResult, self.returnValueInfo["type"])
-        except AssertionError as err:
-            print("capsule result %s, capsule exception %s, err %s" %
-                  (self.capsuleResult, type(self.capsuleException), err.args))
-            time.sleep(0.1)
-            raise err
+        assert checkDataType(
+            self.capsuleResult, self.returnValueInfo["type"],
+            self.returnValueInfo["dimension"])
+        assert checkDataCompatibility(
+            self.capsuleResult, self.returnValueInfo["type"])
 
 
 if __name__ == "__main__":

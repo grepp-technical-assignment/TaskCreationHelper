@@ -32,8 +32,7 @@ from .errors import (
     VersionError, AzadTLE
 )
 from .externalmodule import (
-    getExtension, getSourceFileLanguage,
-    prepareModule_old, prepareExecFunc,
+    getExtension, getSourceFileLanguage, prepareExecFunc,
 )
 from .process import (
     AzadProcessGenerator, AzadProcessSolution, AzadProcessValidator,

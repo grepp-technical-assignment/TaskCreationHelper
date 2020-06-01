@@ -41,28 +41,6 @@ def getSourceFileLanguage(
         return None
 
 
-def prepareModule_old(sourceFilePath: typing.Union[str, Path],
-                      moduleName: str):
-    """
-    Prepare module from given file name.
-    This function is scheduled to be removed.
-    """
-    # Get filename extension
-    fileExtension = getExtension(sourceFilePath)
-    sourceLanguage = getSourceFileLanguage(sourceFilePath)
-
-    # Extension case handling
-    if sourceLanguage is SourceFileLanguage.Python3:
-        spec = importlib.util.spec_from_file_location(
-            moduleName, sourceFilePath)
-        thisModule = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(thisModule)
-        return thisModule
-    else:
-        raise NotImplementedError(
-            "Extension '%s' is not supported" % (fileExtension,))
-
-
 def prepareExecFunc(sourceFilePath: typing.Union[str, Path],
                     sourceFileType: SourceFileType) \
         -> importlib.types.FunctionType:

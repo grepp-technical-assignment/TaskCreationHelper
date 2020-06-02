@@ -71,12 +71,12 @@ IODataTypesInfo = {
     },
     "float": {
         "pytypes": (float, Decimal, Fraction),
-        "constraint": (lambda x: 1.175494351e-38 <= abs(x) <= 3.402823466e38),
+        "constraint": (lambda x: 1.175494351e-38 <= abs(x) <= 3.402823466e38 or x == 0),
         "strize": __IODataTypesInfo_FloatStrize,
     },
     "double": {
         "pytypes": (float, Decimal, Fraction),
-        "constraint": (lambda x: float_info.min <= abs(x) <= float_info.max),
+        "constraint": (lambda x: float_info.min <= abs(x) <= float_info.max or x == 0),
         "strize": __IODataTypesInfo_FloatStrize,
     },
     "str": {

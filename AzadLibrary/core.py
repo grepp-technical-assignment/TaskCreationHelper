@@ -370,7 +370,7 @@ class AzadCore:
             else:
                 self.logger.error(
                     "Generation process #%d failed with unknown reason (Exit code %d):\n%s" %
-                    (i + 1, processes[i].exitcode, processes[i].capsuleException))
+                    (i + 1, processes[i].exitcode, processes[i].raisedTraceback), maxlen = 5000)
                 raise FailedDataGeneration
             processes[i].close()
             gc.collect()

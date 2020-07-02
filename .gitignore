@@ -24,6 +24,7 @@ bin/
 
 # Log files
 *.log
+*.log.*
 
 # Test folders
 **/test/

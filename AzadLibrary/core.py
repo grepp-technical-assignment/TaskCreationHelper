@@ -8,12 +8,18 @@ import json
 import random
 import hashlib
 import os
+import sys
 from pathlib import Path
 import importlib.util
 import typing
 import time
 import atexit
 import gc
+import logging
+import logging.handlers
+import warnings
+
+logger = logging.getLogger(__name__)
 
 # Azad libraries
 from .constants import (
@@ -43,7 +49,6 @@ from .iodata import (
     checkDataType, checkDataCompatibility,
     compareAnswers
 )
-from .logging import Logger
 from .syntax import (
     variableNamePattern,
     cleanGenscript, generatorNamePattern,
@@ -59,9 +64,9 @@ class AzadCore:
     """
 
     def __init__(self, configFilename: typing.Union[str, Path],
-                 log: bool = True):
+                 resetRootLoggerConfig: bool = True):
 
-        # Get configuration JSON and move cwd to there
+        # Get configuration JSON
         if not isinstance(configFilename, (str, Path)):
             raise TypeError
         elif isinstance(configFilename, str):
@@ -70,12 +75,34 @@ class AzadCore:
             parsedConfig: dict = json.load(configFile)
         self.configDirectory = configFilename.parent
 
-        # Logger
-        self.logger = Logger(self.configDirectory / "azadlib.log",
-                             activated=log)
+        # Basic logger settings; Adding new handler into root logger.
+        mainLogFilePath = self.configDirectory / "azadlib.log"
+        with open(mainLogFilePath, "a") as mainLogFile:
+            mainLogFile.write("\n" + "=" * 240 + "\n\n")
+        rootLogger = logging.getLogger()
+        if resetRootLoggerConfig:
+            for oldHandler in rootLogger.handlers[::]:
+                rootLogger.removeHandler(oldHandler)
+        mainFileHandler = logging.handlers.RotatingFileHandler(
+            filename=mainLogFilePath,
+            maxBytes=10 * (2 ** 20), backupCount=5)  # 10MB, 5 backups
+        mainStreamHandler = logging.StreamHandler(sys.stdout)
+        basefmt = "[%%(asctime)s][%%(levelname)-7s][%%(name)s][L%%(lineno)s] %%(message).%ds"
+        datefmt = "%Y/%m/%d %H:%M:%S"
+        mFHFormatter = logging.Formatter(basefmt % (5000,), datefmt)
+        mSHFormatter = logging.Formatter(basefmt % (120,), datefmt)
+        mainFileHandler.setFormatter(mFHFormatter)
+        mainFileHandler.setLevel(logging.DEBUG)
+        mainStreamHandler.setFormatter(mSHFormatter)
+        mainStreamHandler.setLevel(logging.INFO)
+        rootLogger.addHandler(mainFileHandler)
+        rootLogger.addHandler(mainStreamHandler)
+        rootLogger.setLevel(logging.NOTSET)
+
+        self.logger = logger
         self.logger.info("Current directory is %s" % (os.getcwd(),))
         self.logger.info("Target directory is %s" % (self.configDirectory,))
-        self.logger.info("Analyzing configuration file..")
+        self.logger.debug("Analyzing configuration file..")
 
         # Version
         self.version = parsedConfig["version"]["config"]
@@ -86,8 +113,8 @@ class AzadCore:
             raise VersionError("You are using older config version. "
                                "Please upgrade config file to %g" % (SupportedConfigVersion,))
         elif self.version > SupportedConfigVersion:
-            self.logger.warn("You are using future config version(%g vs %g)" %
-                             (self.version, SupportedConfigVersion))
+            warnings.warn("You are using future config version(%g vs %g)" %
+                          (self.version, SupportedConfigVersion))
         self.logger.info("This config file is v%g" % (self.version,))
 
         # Problem name and author
@@ -104,12 +131,12 @@ class AzadCore:
             "time": float(parsedConfig["limits"]["time"]),
             "memory": float(parsedConfig["limits"]["memory"])}
         if self.limits["memory"] < 256:
-            self.logger.warn(
+            warnings.warn(
                 "Too low memory limit %gMB detected. MemoryError may be raised from some module imports." %
                 (self.limits["memory"],))
         elif self.limits["memory"] > 1024:
-            self.logger.warn(
-                "Very large memory limit %gMB detected." % (self.limits["memory"],))
+            warnings.warn("Very large memory limit %gMB detected."
+                          % (self.limits["memory"],))
 
         # Floating point precision
         self.floatPrecision = float(parsedConfig["precision"]) \
@@ -167,9 +194,8 @@ class AzadCore:
         if not self.IOPath.exists():
             os.mkdir(self.IOPath)
         elif tuple(self.IOPath.iterdir()):
-            self.logger.warn(
-                "Given IOPath '%s' is not empty directory" %
-                (self.IOPath,))
+            warnings.warn(
+                "Given IOPath '%s' is not empty directory" % (self.IOPath,))
         elif not inputFilePattern.fullmatch(self.inputFilePathSyntax):
             raise SyntaxError(
                 "Input file syntax '%s' doesn't match syntax" %
@@ -203,7 +229,7 @@ class AzadCore:
                         "Solution '%s'(%s) is not a file" %
                         (thisPath, ",".join(c.value.upper() for c in thisCategories)))
         if (SolutionCategory.AC,) not in self.solutions:
-            self.logger.warn("There is no AC-only solution.")
+            warnings.warn("There is no AC-only solution.")
 
         # Generators
         self.logger.debug("Validating generator files..")
@@ -230,13 +256,13 @@ class AzadCore:
         self.genScripts = cleanGenscript(
             parsedConfig["genscript"], self.generators.keys())
         if not self.genScripts:
-            self.logger.warn("There is no genscript.")
+            warnings.warn("There is no genscript.")
 
         # Validator
         self.logger.debug("Validating validator file..")
         self.validator = parsedConfig["validator"].strip()
         if not self.validator:
-            self.logger.warn("There is no validator.")
+            warnings.warn("There is no validator.")
         elif not Path(self.validator).exists():
             raise FileNotFoundError(
                 "Validator file '%s' not found" % (self.validator,))
@@ -309,7 +335,7 @@ class AzadCore:
                 self.logger.error(
                     "Validation process #%d failed with exit code %d:\n%s" %
                     (i + 1, processes[i].exitcode,
-                     processes[i].raisedTraceback), maxlen=2000)
+                     processes[i].raisedTraceback))
                 raise FailedDataValidation
             processes[i].close()
             gc.collect()
@@ -359,7 +385,7 @@ class AzadCore:
             elif processes[i].exitcode == ExitCodeFailedInAVPhase:
                 self.logger.error(
                     "Generation process #%d generated wrong data:\n%s" %
-                    (i + 1, processes[i].raisedTraceback), maxlen=2000)
+                    (i + 1, processes[i].raisedTraceback))
                 raise FailedDataGeneration
             elif processes[i].exitcode == ExitCodeTLE:
                 raise FailedDataGeneration(
@@ -405,7 +431,7 @@ class AzadCore:
             raise ValueError("Category is %s but mainAC is True" %
                              (",".join(c.value.upper() for c in intendedCategories)))
         if sourceFilePath not in self.solutions[intendedCategories]:
-            self.logger.warn(
+            warnings.warn(
                 "You are trying to execute non-registered solution file '%s' (%s)" %
                 (sourceFilePath, ",".join(c.value.upper() for c in intendedCategories)))
 
@@ -470,13 +496,12 @@ class AzadCore:
         self.logger.info(
             "Executed solution for all data in %g seconds." %
             (endTime - startTime,))
-        self.logger.info("Answers = %s" % (producedAnswers,))
+        self.logger.info("Answers = %s", producedAnswers)
         verdictCounts = {category: verdicts.count(category)
                          for category in SolutionCategory}
-        self.logger.info("Solution '%s' verdict: %s" %
-                         (sourceFilePath.parts[-1],
-                          {key.value.upper(): verdictCounts[key]
-                              for key in verdictCounts}), maxlen=500)
+        self.logger.info("Solution '%s' verdict: %s",
+                         sourceFilePath.parts[-1],
+                         {key.value.upper(): verdictCounts[key] for key in verdictCounts})
         if not validateVerdict(verdictCounts, intendedCategories):
             raise WrongSolutionFileCategory(
                 "Solution '%s' failed verdict validation." %
@@ -519,7 +544,7 @@ class AzadCore:
                          (self.IOPath, outputFileSyntax))
         cleanIOFilePath(self.IOPath, [".out.txt"])
         if not self.producedAnswers:
-            self.logger.warn("Answer is not produced yet. Producing first..")
+            warnings.warn("Answer is not produced yet. Producing first..")
             self.producedAnswers = self.executeSolution(
                 self.solutions[(SolutionCategory.AC,)][0], SolutionCategory.AC, mainAC=True)
             if not self.producedAnswers:

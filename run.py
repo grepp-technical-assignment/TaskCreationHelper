@@ -1,16 +1,17 @@
+# Standard libraries
+import typing
+from copy import deepcopy
+import json
+import re
+import os
+from sys import argv
+from pathlib import Path
+import warnings
+import logging
+import atexit
+
 # Main Execution
 if __name__ == "__main__":
-
-    # Standard libraries
-    import typing
-    from copy import deepcopy
-    import json
-    import re
-    import os
-    from sys import argv
-    from pathlib import Path
-    import warnings
-    import atexit
 
     # Azad library
     from AzadLibrary import AzadCore, StartingConfigState
@@ -20,6 +21,7 @@ if __name__ == "__main__":
     print(barLine("Azad Library"))
     atexit.register(print, barLine("Azad Library Termination"))
     startInformation = deepcopy(StartingConfigState)
+    logging.captureWarnings(True)
 
     if subcommand == "help":  # Help
         helpStr = """
@@ -91,7 +93,3 @@ List of subcommands:
         raise ValueError(
             "Given subcommand %s is not valid. Please try \"python3 run.py help\"." %
             (subcommand,))
-
-else:
-    # warnings.warn("run.py should not be included by other modules")
-    pass

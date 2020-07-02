@@ -8,12 +8,18 @@ import json
 import random
 import hashlib
 import os
+import sys
 from pathlib import Path
 import importlib.util
 import typing
 import time
 import atexit
 import gc
+import logging
+import logging.handlers
+import warnings
+
+logger = logging.getLogger(__name__)
 
 # Azad libraries
 from .constants import (
@@ -21,6 +27,7 @@ from .constants import (
     DefaultFloatPrecision, DefaultIOPath,
     DefaultInputSyntax, DefaultOutputSyntax,
     DefaultTimeLimit, DefaultMemoryLimit,  # Limits
+    DefaultLoggingFilePath, DefaultLogFileMaxSize, DefaultLogFileBackups,
     IODataTypesInfo, DefaultTypeStrings, MaxParameterDimensionAllowed,  # IO data types
     SolutionCategory, SourceFileLanguage, SourceFileType,  # Source file related
     ExitCodeSuccess, ExitCodeTLE, ExitCodeMLE,  # Exit codes
@@ -43,7 +50,6 @@ from .iodata import (
     checkDataType, checkDataCompatibility,
     compareAnswers
 )
-from .logging import Logger
 from .syntax import (
     variableNamePattern,
     cleanGenscript, generatorNamePattern,
@@ -59,9 +65,9 @@ class AzadCore:
     """
 
     def __init__(self, configFilename: typing.Union[str, Path],
-                 log: bool = True):
+                 resetRootLoggerConfig: bool = True):
 
-        # Get configuration JSON and move cwd to there
+        # Get configuration JSON
         if not isinstance(configFilename, (str, Path)):
             raise TypeError
         elif isinstance(configFilename, str):
@@ -70,12 +76,43 @@ class AzadCore:
             parsedConfig: dict = json.load(configFile)
         self.configDirectory = configFilename.parent
 
-        # Logger
-        self.logger = Logger(self.configDirectory / "azadlib.log",
-                             activated=log)
-        self.logger.info("Current directory is %s" % (os.getcwd(),))
-        self.logger.info("Target directory is %s" % (self.configDirectory,))
-        self.logger.info("Analyzing configuration file..")
+        # Log directory
+        if "log" in parsedConfig:
+            mainLogFilePath = self.configDirectory / parsedConfig["log"]
+        else:
+            mainLogFilePath = self.configDirectory / "azadlib.log"
+
+        # Basic logger settings; Adding new handler into root logger.
+        mainLogFilePath = self.configDirectory / (
+            parsedConfig["log"] if "log" in parsedConfig
+            else DefaultLoggingFilePath)
+        with open(mainLogFilePath, "a") as mainLogFile:
+            mainLogFile.write("\n" + "=" * 240 + "\n\n")
+        rootLogger = logging.getLogger()
+        if resetRootLoggerConfig:
+            for oldHandler in rootLogger.handlers[::]:
+                rootLogger.removeHandler(oldHandler)
+        mainFileHandler = logging.handlers.RotatingFileHandler(
+            filename=mainLogFilePath,
+            maxBytes=DefaultLogFileMaxSize,
+            backupCount=DefaultLogFileBackups)
+        mainStreamHandler = logging.StreamHandler(sys.stdout)
+        basefmt = "[%%(asctime)s][%%(levelname)-7s][%%(name)s][L%%(lineno)s] %%(message).%ds"
+        datefmt = "%Y/%m/%d %H:%M:%S"
+        mFHFormatter = logging.Formatter(basefmt % (5000,), datefmt)
+        mSHFormatter = logging.Formatter(basefmt % (120,), datefmt)
+        mainFileHandler.setFormatter(mFHFormatter)
+        mainFileHandler.setLevel(logging.DEBUG)
+        mainStreamHandler.setFormatter(mSHFormatter)
+        mainStreamHandler.setLevel(logging.INFO)
+        rootLogger.addHandler(mainFileHandler)
+        rootLogger.addHandler(mainStreamHandler)
+        rootLogger.setLevel(logging.NOTSET)
+
+        self.logger = logger
+        self.logger.info("Current directory is %s", os.getcwd())
+        self.logger.info("Target directory is %s", self.configDirectory)
+        self.logger.debug("Analyzing configuration file..")
 
         # Version
         self.version = parsedConfig["version"]["config"]
@@ -86,17 +123,17 @@ class AzadCore:
             raise VersionError("You are using older config version. "
                                "Please upgrade config file to %g" % (SupportedConfigVersion,))
         elif self.version > SupportedConfigVersion:
-            self.logger.warn("You are using future config version(%g vs %g)" %
-                             (self.version, SupportedConfigVersion))
-        self.logger.info("This config file is v%g" % (self.version,))
+            warnings.warn("You are using future config version(%g vs %g)" %
+                          (self.version, SupportedConfigVersion))
+        self.logger.info("This config file is v%g", self.version)
 
         # Problem name and author
         self.logger.debug("Validating name, author and problem version..")
         self.problemName = parsedConfig["name"] if "name" in parsedConfig else None
         self.author = parsedConfig["author"] if "author" in parsedConfig else None
         self.problemVersion = parsedConfig["version"]["problem"] if "problem" in parsedConfig["version"] else 0.0
-        self.logger.info("You opened '%s' v%g made by %s." %
-                         (self.problemName, self.problemVersion, self.author))
+        self.logger.info("You opened '%s' v%g made by %s.",
+                         self.problemName, self.problemVersion, self.author)
 
         # Limits (Memory limit is currently unused)
         self.logger.debug("Validating limits and real number precision..")
@@ -104,12 +141,12 @@ class AzadCore:
             "time": float(parsedConfig["limits"]["time"]),
             "memory": float(parsedConfig["limits"]["memory"])}
         if self.limits["memory"] < 256:
-            self.logger.warn(
+            warnings.warn(
                 "Too low memory limit %gMB detected. MemoryError may be raised from some module imports." %
                 (self.limits["memory"],))
         elif self.limits["memory"] > 1024:
-            self.logger.warn(
-                "Very large memory limit %gMB detected." % (self.limits["memory"],))
+            warnings.warn("Very large memory limit %gMB detected."
+                          % (self.limits["memory"],))
 
         # Floating point precision
         self.floatPrecision = float(parsedConfig["precision"]) \
@@ -167,9 +204,8 @@ class AzadCore:
         if not self.IOPath.exists():
             os.mkdir(self.IOPath)
         elif tuple(self.IOPath.iterdir()):
-            self.logger.warn(
-                "Given IOPath '%s' is not empty directory" %
-                (self.IOPath,))
+            warnings.warn(
+                "Given IOPath '%s' is not empty directory" % (self.IOPath,))
         elif not inputFilePattern.fullmatch(self.inputFilePathSyntax):
             raise SyntaxError(
                 "Input file syntax '%s' doesn't match syntax" %
@@ -203,7 +239,7 @@ class AzadCore:
                         "Solution '%s'(%s) is not a file" %
                         (thisPath, ",".join(c.value.upper() for c in thisCategories)))
         if (SolutionCategory.AC,) not in self.solutions:
-            self.logger.warn("There is no AC-only solution.")
+            warnings.warn("There is no AC-only solution.")
 
         # Generators
         self.logger.debug("Validating generator files..")
@@ -230,13 +266,13 @@ class AzadCore:
         self.genScripts = cleanGenscript(
             parsedConfig["genscript"], self.generators.keys())
         if not self.genScripts:
-            self.logger.warn("There is no genscript.")
+            warnings.warn("There is no genscript.")
 
         # Validator
         self.logger.debug("Validating validator file..")
         self.validator = parsedConfig["validator"].strip()
         if not self.validator:
-            self.logger.warn("There is no validator.")
+            warnings.warn("There is no validator.")
         elif not Path(self.validator).exists():
             raise FileNotFoundError(
                 "Validator file '%s' not found" % (self.validator,))
@@ -287,29 +323,28 @@ class AzadCore:
             ) for i in range(len(data))
         ]
         for i in range(len(data)):
-            self.logger.debug("Validation process #%d started.." % (i + 1,))
+            self.logger.debug("Validation process #%d started..", i + 1)
             processes[i].start()
         for i in range(len(data)):
-            self.logger.info("Waiting validation process #%d.." % (i + 1,))
+            self.logger.info("Waiting validation process #%d..", i + 1)
             processes[i].join()
             self.tempFileSystem.pop(tempInputFiles[i])
 
         # Analyze results
         for i in range(len(data)):
-            self.logger.debug("Analyzing validation process #%d.." % (i + 1,))
+            self.logger.debug("Analyzing validation process #%d..", i + 1)
             if processes[i].exitcode == ExitCodeSuccess:
                 self.logger.debug("Ok, validation passed.")
             elif processes[i].exitcode == ExitCodeTLE:
                 raise FailedDataValidation(
-                    "Validation process #%d got TLE" % (i + 1,))
+                    "Validation process #%d got TLE", i + 1)
             elif processes[i].exitcode == ExitCodeMLE:
                 raise FailedDataValidation(
-                    "Validation process #%d got MLE" % (i + 1,))
+                    "Validation process #%d got MLE", i + 1)
             else:
                 self.logger.error(
-                    "Validation process #%d failed with exit code %d:\n%s" %
-                    (i + 1, processes[i].exitcode,
-                     processes[i].raisedTraceback), maxlen=2000)
+                    "Validation process #%d failed with exit code %d:\n%s",
+                    i + 1, processes[i].exitcode, processes[i].raisedTraceback)
                 raise FailedDataValidation
             processes[i].close()
             gc.collect()
@@ -317,7 +352,7 @@ class AzadCore:
         # Check performance
         endTime = time.perf_counter()
         self.logger.info(
-            "Validated all data in %g seconds." % (endTime - startTime,))
+            "Validated all data in %g seconds.", endTime - startTime)
 
     def generateInput(self, validate: bool = True) -> list:
         """
@@ -338,39 +373,40 @@ class AzadCore:
             elements = genscript.split(" ")
             genFilePath = self.generators[elements[0]]
             args = elements[1:]
-            self.logger.debug("Starting generation process #%d, genscript = '%s'.." %
-                              (i + 1, genscript))
+            self.logger.debug(
+                "Starting generation process #%d, genscript = '%s'..",
+                i + 1, genscript)
             processes.append(AzadProcessGenerator(
                 genFilePath, args, self.parameters,
                 outFilePath=tempOutFilePaths[i],
                 timelimit=10.0, memlimit=1024))
             processes[-1].start()
         for i in range(len(self.genScripts)):
-            self.logger.info("Waiting generation process #%d.." % (i + 1,))
+            self.logger.info("Waiting generation process #%d..", i + 1)
             processes[i].join()
             self.tempFileSystem.pop(tempOutFilePaths[i])
 
         # Analyze results
         result = []
         for i in range(len(self.genScripts)):
-            self.logger.debug("Analyzing generation process #%d.." % (i + 1,))
+            self.logger.debug("Analyzing generation process #%d..", i + 1)
             if processes[i].exitcode == ExitCodeSuccess:
                 result.append(processes[i].returnedValue)
             elif processes[i].exitcode == ExitCodeFailedInAVPhase:
                 self.logger.error(
-                    "Generation process #%d generated wrong data:\n%s" %
-                    (i + 1, processes[i].raisedTraceback), maxlen=2000)
+                    "Generation process #%d generated wrong data:\n%s",
+                    i + 1, processes[i].raisedTraceback)
                 raise FailedDataGeneration
             elif processes[i].exitcode == ExitCodeTLE:
                 raise FailedDataGeneration(
-                    "Generation process #%d got TLE" % (i + 1,))
+                    "Generation process #%d got TLE", i + 1)
             elif processes[i].exitcode == ExitCodeMLE:
                 raise FailedDataGeneration(
-                    "Generation process #%d got MLE" % (i + 1,))
+                    "Generation process #%d got MLE", i + 1)
             else:
                 self.logger.error(
-                    "Generation process #%d failed with unknown reason (Exit code %d):\n%s" %
-                    (i + 1, processes[i].exitcode, processes[i].raisedTraceback), maxlen = 5000)
+                    "Generation process #%d failed with unknown reason (Exit code %d):\n%s",
+                    i + 1, processes[i].exitcode, processes[i].raisedTraceback)
                 raise FailedDataGeneration
             processes[i].close()
             gc.collect()
@@ -378,7 +414,7 @@ class AzadCore:
         # Check performance
         endTime = time.perf_counter()
         self.logger.info(
-            "Generated all data in %g seconds." % (endTime - startTime,))
+            "Generated all data in %g seconds.", endTime - startTime)
 
         # If there is an validator then validate it
         if self.validator and validate:
@@ -405,7 +441,7 @@ class AzadCore:
             raise ValueError("Category is %s but mainAC is True" %
                              (",".join(c.value.upper() for c in intendedCategories)))
         if sourceFilePath not in self.solutions[intendedCategories]:
-            self.logger.warn(
+            warnings.warn(
                 "You are trying to execute non-registered solution file '%s' (%s)" %
                 (sourceFilePath, ",".join(c.value.upper() for c in intendedCategories)))
 
@@ -414,7 +450,7 @@ class AzadCore:
             self.inputDatas = self.generateInput(validate=True)
 
         # Do multiprocessing
-        self.logger.info("Analyzing solution '%s'.." % (sourceFilePath,))
+        self.logger.info("Analyzing solution '%s'..", sourceFilePath)
         startTime = time.perf_counter()
         verdicts = []
         producedAnswers = []
@@ -428,14 +464,14 @@ class AzadCore:
             timelimit=self.limits["time"], memlimit=self.limits["memory"]
         ) for i in range(len(self.inputDatas))]
         for i in range(len(self.inputDatas)):
-            self.logger.debug("Starting solution process #%d.." % (i + 1,))
+            self.logger.debug("Starting solution process #%d..", i + 1)
             processes[i].start()
         for i in range(len(self.inputDatas)):
-            self.logger.info("Waiting solution process #%d.." % (i + 1,))
+            self.logger.info("Waiting solution process #%d..", i + 1)
             processes[i].join()
             self.tempFileSystem.pop(tempFiles[i])
         for i in range(len(self.inputDatas)):
-            self.logger.debug("Analyzing solution process #%d.." % (i + 1,))
+            self.logger.debug("Analyzing solution process #%d..", i + 1)
             if processes[i].exitcode == ExitCodeSuccess:
                 # I will implement customized checker,
                 # this is why I separated answer checking from multiprocessing.
@@ -455,28 +491,27 @@ class AzadCore:
                     verdicts.append(SolutionCategory.MLE)
                 else:
                     self.logger.debug(
-                        "Solution '%s' failed with exitcode %d:\n%s" %
-                        (sourceFilePath.parts[-1], processes[i].exitcode,
-                         processes[i].raisedTraceback))
+                        "Solution '%s' failed with exitcode %d:\n%s",
+                        sourceFilePath.parts[-1], processes[i].exitcode,
+                        processes[i].raisedTraceback)
                     verdicts.append(SolutionCategory.FAIL)
             processes[i].close()
             gc.collect()
-            self.logger.debug("Solution '%s' got %s at test #%d." %
-                              (sourceFilePath.parts[-1],
-                               verdicts[-1].value.upper(), i + 1))
+            self.logger.debug("Solution '%s' got %s at test #%d.",
+                              sourceFilePath.parts[-1],
+                              verdicts[-1].value.upper(), i + 1)
 
         # Validate verdicts and return produced answers
         endTime = time.perf_counter()
         self.logger.info(
-            "Executed solution for all data in %g seconds." %
-            (endTime - startTime,))
-        self.logger.info("Answers = %s" % (producedAnswers,))
+            "Executed solution for all data in %g seconds.",
+            endTime - startTime)
+        self.logger.info("Answers = %s", producedAnswers)
         verdictCounts = {category: verdicts.count(category)
                          for category in SolutionCategory}
-        self.logger.info("Solution '%s' verdict: %s" %
-                         (sourceFilePath.parts[-1],
-                          {key.value.upper(): verdictCounts[key]
-                              for key in verdictCounts}), maxlen=500)
+        self.logger.info("Solution '%s' verdict: %s",
+                         sourceFilePath.parts[-1],
+                         {key.value.upper(): verdictCounts[key] for key in verdictCounts})
         if not validateVerdict(verdictCounts, intendedCategories):
             raise WrongSolutionFileCategory(
                 "Solution '%s' failed verdict validation." %
@@ -491,8 +526,8 @@ class AzadCore:
             inputFileSyntax = self.inputFilePathSyntax
         elif not inputFilePattern.fullmatch(inputFileSyntax):
             raise SyntaxError
-        self.logger.info("Making input files '%s/%s..'" %
-                         (self.IOPath, inputFileSyntax))
+        self.logger.info("Making input files '%s/%s..'",
+                         self.IOPath, inputFileSyntax)
         cleanIOFilePath(self.IOPath, [".in.txt"])
         if not self.inputDatas:
             self.inputDatas = self.generateInput()
@@ -501,8 +536,7 @@ class AzadCore:
             i += 1
             with open(self.IOPath / (inputFileSyntax % (i,)), "w") as inputFile:
                 self.logger.debug(
-                    "Writing %d-th input file '%s'.." %
-                    (i, inputFile.name))
+                    "Writing %d-th input file '%s'..", i, inputFile.name)
                 inputFile.write(",".join(
                     PGizeData(data[name], self.parameters[name]["type"])
                     for name in self.parameterNamesSorted))
@@ -515,11 +549,11 @@ class AzadCore:
             outputFileSyntax = self.outputFilePathSyntax
         elif not outputFilePattern.fullmatch(outputFileSyntax):
             raise SyntaxError
-        self.logger.info("Making output files '%s/%s..'" %
-                         (self.IOPath, outputFileSyntax))
+        self.logger.info("Making output files '%s/%s..'",
+                         self.IOPath, outputFileSyntax)
         cleanIOFilePath(self.IOPath, [".out.txt"])
         if not self.producedAnswers:
-            self.logger.warn("Answer is not produced yet. Producing first..")
+            warnings.warn("Answer is not produced yet. Producing first..")
             self.producedAnswers = self.executeSolution(
                 self.solutions[(SolutionCategory.AC,)][0], SolutionCategory.AC, mainAC=True)
             if not self.producedAnswers:
@@ -529,8 +563,8 @@ class AzadCore:
             i += 1
             with open(self.IOPath / (outputFileSyntax % (i,)), "w") as outputFile:
                 self.logger.debug(
-                    "Writing %d-th output file '%s'.." %
-                    (i, outputFile.name))
+                    "Writing %d-th output file '%s'..",
+                    i, outputFile.name)
                 outputFile.write(PGizeData(data, self.returnValueInfo["type"]))
 
     def checkAllSolutionFiles(self):

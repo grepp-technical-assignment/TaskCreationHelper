@@ -10,9 +10,12 @@ import shutil
 import atexit
 import threading
 import json
+import logging
 
 # Azad libraries
 from .misc import (randomName,)
+
+logger = logging.getLogger(__name__)
 
 
 class TempFileSystem:
@@ -31,6 +34,8 @@ class TempFileSystem:
         self.tempfiles: typing.Set[Path] = set()
         self.closed = False
         atexit.register(self.close)
+        logger.info("Temporary filesystem based on '%s' is created.",
+                    self.basePath)
 
     def newTempFile(self, content: typing.Union[str, bytes] = None,
                     extension: str = "temp", randomLength: int = 60,
@@ -102,6 +107,8 @@ class TempFileSystem:
         """
         if self.closed:
             return
+        logger.info("Temporary filesystem based on '%s' is closing..",
+                    self.basePath)
         self.closed = True
         self.tempfiles.clear()
         shutil.rmtree(self.basePath)

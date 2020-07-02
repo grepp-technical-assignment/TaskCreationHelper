@@ -20,6 +20,9 @@ DefaultOutputSyntax = "%02d.out.txt"
 DefaultTimeLimit = 5.0  # seconds
 DefaultMemoryLimit = 1024  # megabytes; Not used
 MaxParameterDimensionAllowed = 2
+DefaultLoggingFilePath = "azadlib.log"
+DefaultLogFileMaxSize = 10 * (2 ** 20)  # 10MB
+DefaultLogFileBackups = 5  # blabla.log.%d
 
 
 # Default typestring for all accepted types.
@@ -163,6 +166,7 @@ StartingConfigState = {
         "sample big random 100 0.1",
         "sample small random 100 0.2"
     ],
+    "log": "azadlib.log",  # Optional
     "iofiles": {
         "path": DefaultIOPath,
         "inputsyntax": DefaultInputSyntax,

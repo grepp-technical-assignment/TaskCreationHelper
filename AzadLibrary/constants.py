@@ -11,6 +11,10 @@ from sys import float_info
 import typing
 
 
+# Azad Library Version
+AzadLibraryVersion = "0.2.1"
+
+
 # Config defaults
 SupportedConfigVersion = 1.0
 DefaultFloatPrecision = 1e-3

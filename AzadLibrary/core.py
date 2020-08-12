@@ -94,6 +94,7 @@ class AzadCore:
         rootLogger.addHandler(mainStreamHandler)
         rootLogger.setLevel(logging.NOTSET)
 
+        logger.info("Azad Library Version is %s", Const.AzadLibraryVersion)
         logger.info("Current directory is %s", os.getcwd())
         logger.info("Target directory is %s", self.configDirectory)
         logger.debug("Analyzing configuration file..")

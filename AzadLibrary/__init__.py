@@ -4,6 +4,6 @@ Read "README.md" on repository root folder for more details.
 """
 
 from .core import AzadCore
-from .constants import StartingConfigState
+from .constants import StartingConfigState, AzadLibraryVersion
 
-__version__ = "0.2.0"
+__version__ = AzadLibraryVersion

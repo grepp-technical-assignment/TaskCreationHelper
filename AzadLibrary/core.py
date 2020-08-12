@@ -303,7 +303,7 @@ class AzadCore:
             AzadProcessValidator(
                 sourceFilePath,
                 tempInputFiles[i],
-                timelimit=5.0, memlimit=256,
+                timelimit=5.0, memlimit=1024,
             ) for i in range(len(data))
         ]
         for i in range(len(data)):

@@ -1,5 +1,4 @@
 # Standard libraries
-import typing
 from copy import deepcopy
 import json
 import re

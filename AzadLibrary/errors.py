@@ -2,9 +2,6 @@
 This module contains exceptions for Azad library.
 """
 
-# Azad library
-from .constants import SolutionCategory
-
 
 class AzadError(Exception):
     """

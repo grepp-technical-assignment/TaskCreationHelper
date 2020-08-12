@@ -3,14 +3,10 @@ This module is core of Azad library.
 """
 
 # Standard libraries
-from copy import deepcopy
 import json
-import random
-import hashlib
 import os
 import sys
 from pathlib import Path
-import importlib.util
 import typing
 import time
 import atexit
@@ -22,18 +18,7 @@ import warnings
 logger = logging.getLogger(__name__)
 
 # Azad libraries
-from .constants import (
-    SupportedConfigVersion,
-    DefaultFloatPrecision, DefaultIOPath,
-    DefaultInputSyntax, DefaultOutputSyntax,
-    DefaultTimeLimit, DefaultMemoryLimit,  # Limits
-    DefaultLoggingFilePath, DefaultLogFileMaxSize, DefaultLogFileBackups,
-    IODataTypesInfo, DefaultTypeStrings, MaxParameterDimensionAllowed,  # IO data types
-    SolutionCategory, SourceFileLanguage, SourceFileType,  # Source file related
-    ExitCodeSuccess, ExitCodeTLE, ExitCodeMLE,  # Exit codes
-    ExitCodeFailedInAVPhase, ExitCodeFailedInBPPhase, ExitCodeFailedInLoopPhase,
-    ExitCodeFailedToReturnData,
-)
+from . import constants as Const
 from .errors import (
     AzadError, FailedDataValidation, FailedDataGeneration,
     NotSupportedExtension, WrongSolutionFileCategory,
@@ -85,7 +70,7 @@ class AzadCore:
         # Basic logger settings; Adding new handler into root logger.
         mainLogFilePath = self.configDirectory / (
             parsedConfig["log"] if "log" in parsedConfig
-            else DefaultLoggingFilePath)
+            else Const.DefaultLoggingFilePath)
         with open(mainLogFilePath, "a") as mainLogFile:
             mainLogFile.write("\n" + "=" * 240 + "\n\n")
         rootLogger = logging.getLogger()
@@ -94,8 +79,8 @@ class AzadCore:
                 rootLogger.removeHandler(oldHandler)
         mainFileHandler = logging.handlers.RotatingFileHandler(
             filename=mainLogFilePath,
-            maxBytes=DefaultLogFileMaxSize,
-            backupCount=DefaultLogFileBackups)
+            maxBytes=Const.DefaultLogFileMaxSize,
+            backupCount=Const.DefaultLogFileBackups)
         mainStreamHandler = logging.StreamHandler(sys.stdout)
         basefmt = "[%%(asctime)s][%%(levelname)-7s][%%(name)s][L%%(lineno)s] %%(message).%ds"
         datefmt = "%Y/%m/%d %H:%M:%S"
@@ -118,12 +103,13 @@ class AzadCore:
         if not isinstance(self.version, (int, float)):
             raise TypeError(
                 "Invalid type %s given for config version" % (type(self.version),))
-        elif self.version < SupportedConfigVersion:
+        elif self.version < Const.SupportedConfigVersion:
             raise VersionError("You are using older config version. "
-                               "Please upgrade config file to %g" % (SupportedConfigVersion,))
-        elif self.version > SupportedConfigVersion:
+                               "Please upgrade config file to %g" %
+                               (Const.SupportedConfigVersion,))
+        elif self.version > Const.SupportedConfigVersion:
             warnings.warn("You are using future config version(%g vs %g)" %
-                          (self.version, SupportedConfigVersion))
+                          (self.version, Const.SupportedConfigVersion))
         logger.info("This config file is v%g", self.version)
 
         # Problem name and author
@@ -149,7 +135,7 @@ class AzadCore:
 
         # Floating point precision
         self.floatPrecision = float(parsedConfig["precision"]) \
-            if "precision" in parsedConfig else DefaultFloatPrecision
+            if "precision" in parsedConfig else Const.DefaultFloatPrecision
         if self.floatPrecision <= 0:
             raise ValueError("Non positive float precision")
 
@@ -166,10 +152,10 @@ class AzadCore:
             elif varName in self.parameters:
                 raise ValueError(
                     "Parameter name %s occurred multiple times" % (varName,))
-            elif varType not in IODataTypesInfo:
+            elif varType not in Const.IODataTypesInfo:
                 raise ValueError("Parameter %s's type is invalid type '%s'" %
                                  (varName, varType))
-            elif not (0 <= dimension <= MaxParameterDimensionAllowed):
+            elif not (0 <= dimension <= Const.MaxParameterDimensionAllowed):
                 raise ValueError("Invalid dimension %d for parameter %s given" %
                                  (dimension, varName))
             self.parameters[varName] = {
@@ -182,7 +168,7 @@ class AzadCore:
         # Return value
         logger.debug("Validating return value..")
         returnVarType = parsedConfig["return"]["type"]
-        if returnVarType not in IODataTypesInfo:
+        if returnVarType not in Const.IODataTypesInfo:
             raise ValueError(
                 "Return value type '%s' is invalid" % (returnVarType,))
         returnDimension = int(parsedConfig["return"]["dimension"])
@@ -196,10 +182,10 @@ class AzadCore:
                 parsedConfig["iofiles"]["path"]
             self.inputFilePathSyntax: str = parsedConfig["iofiles"]["inputsyntax"]
             self.outputFilePathSyntax: str = parsedConfig["iofiles"]["outputsyntax"]
-        except NameError as err:
-            self.IOPath: Path = self.configDirectory / DefaultIOPath
-            self.inputFilePathSyntax: str = DefaultInputSyntax
-            self.outputFilePathSyntax: str = DefaultOutputSyntax
+        except NameError:
+            self.IOPath: Path = self.configDirectory / Const.DefaultIOPath
+            self.inputFilePathSyntax: str = Const.DefaultInputSyntax
+            self.outputFilePathSyntax: str = Const.DefaultOutputSyntax
         if not self.IOPath.exists():
             os.mkdir(self.IOPath)
         elif tuple(self.IOPath.iterdir()):
@@ -215,12 +201,11 @@ class AzadCore:
                 (self.outputFilePathSyntax,))
 
         # Pick category from word ac/wa/tle/mle/fail
-        def pickCategory(word: str) -> SolutionCategory:
-            for category in SolutionCategory:
+        def pickCategory(word: str) -> Const.SolutionCategory:
+            for category in Const.SolutionCategory:
                 if category.value == word:
                     return category
-            else:
-                raise ValueError("No matching category for word %s" % (word,))
+            raise ValueError("No matching category for word %s" % (word,))
 
         # Solution files
         logger.debug("Validating solution files..")
@@ -237,7 +222,7 @@ class AzadCore:
                     raise FileNotFoundError(
                         "Solution '%s'(%s) is not a file" %
                         (thisPath, ",".join(c.value.upper() for c in thisCategories)))
-        if (SolutionCategory.AC,) not in self.solutions:
+        if (Const.SolutionCategory.AC,) not in self.solutions:
             warnings.warn("There is no AC-only solution.")
 
         # Generators
@@ -325,19 +310,18 @@ class AzadCore:
             logger.debug("Validation process #%d started..", i + 1)
             processes[i].start()
         for i in range(len(data)):
-            logger.info("Waiting validation process #%d..", i + 1)
             processes[i].join()
             self.tempFileSystem.pop(tempInputFiles[i])
 
         # Analyze results
         for i in range(len(data)):
             logger.debug("Analyzing validation process #%d..", i + 1)
-            if processes[i].exitcode == ExitCodeSuccess:
+            if processes[i].exitcode == Const.ExitCodeSuccess:
                 logger.debug("Ok, validation passed.")
-            elif processes[i].exitcode == ExitCodeTLE:
+            elif processes[i].exitcode == Const.ExitCodeTLE:
                 raise FailedDataValidation(
                     "Validation process #%d got TLE", i + 1)
-            elif processes[i].exitcode == ExitCodeMLE:
+            elif processes[i].exitcode == Const.ExitCodeMLE:
                 raise FailedDataValidation(
                     "Validation process #%d got MLE", i + 1)
             else:
@@ -389,17 +373,17 @@ class AzadCore:
         result = []
         for i in range(len(self.genScripts)):
             logger.debug("Analyzing generation process #%d..", i + 1)
-            if processes[i].exitcode == ExitCodeSuccess:
+            if processes[i].exitcode == Const.ExitCodeSuccess:
                 result.append(processes[i].returnedValue)
-            elif processes[i].exitcode == ExitCodeFailedInAVPhase:
+            elif processes[i].exitcode == Const.ExitCodeFailedInAVPhase:
                 logger.error(
                     "Generation process #%d generated wrong data:\n%s",
                     i + 1, processes[i].raisedTraceback)
                 raise FailedDataGeneration
-            elif processes[i].exitcode == ExitCodeTLE:
+            elif processes[i].exitcode == Const.ExitCodeTLE:
                 raise FailedDataGeneration(
                     "Generation process #%d got TLE", i + 1)
-            elif processes[i].exitcode == ExitCodeMLE:
+            elif processes[i].exitcode == Const.ExitCodeMLE:
                 raise FailedDataGeneration(
                     "Generation process #%d got MLE", i + 1)
             else:
@@ -421,8 +405,8 @@ class AzadCore:
         return result
 
     def executeSolution(self, sourceFilePath: typing.Union[str, Path],
-                        intendedCategories: typing.List[SolutionCategory]
-                        = (SolutionCategory.AC,),
+                        intendedCategories: typing.List[Const.SolutionCategory]
+                        = (Const.SolutionCategory.AC,),
                         mainAC: bool = False) -> list:
         """
         Execute sourcefile as solution by given file name.
@@ -431,12 +415,12 @@ class AzadCore:
         """
 
         # Validate parameters
-        if isinstance(intendedCategories, SolutionCategory):
+        if isinstance(intendedCategories, Const.SolutionCategory):
             intendedCategories = (intendedCategories,)
         elif not isinstance(intendedCategories, (list, tuple)):
             raise TypeError("Invalid type %s given for category" %
                             (type(intendedCategories),))
-        if intendedCategories != (SolutionCategory.AC,) and mainAC:
+        if intendedCategories != (Const.SolutionCategory.AC,) and mainAC:
             raise ValueError("Category is %s but mainAC is True" %
                              (",".join(c.value.upper() for c in intendedCategories)))
         if sourceFilePath not in self.solutions[intendedCategories]:
@@ -471,7 +455,7 @@ class AzadCore:
             self.tempFileSystem.pop(tempFiles[i])
         for i in range(len(self.inputDatas)):
             logger.debug("Analyzing solution process #%d..", i + 1)
-            if processes[i].exitcode == ExitCodeSuccess:
+            if processes[i].exitcode == Const.ExitCodeSuccess:
                 # I will implement customized checker,
                 # this is why I separated answer checking from multiprocessing.
                 thisAnswer = processes[i].returnedValue
@@ -479,21 +463,21 @@ class AzadCore:
                 if mainAC or compareAnswers(
                         self.producedAnswers[i], thisAnswer,
                         floatPrecision=self.floatPrecision):
-                    verdicts.append(SolutionCategory.AC)
+                    verdicts.append(Const.SolutionCategory.AC)
                 else:
-                    verdicts.append(SolutionCategory.WA)
+                    verdicts.append(Const.SolutionCategory.WA)
             else:
                 producedAnswers.append(None)
-                if processes[i].exitcode == ExitCodeTLE:
-                    verdicts.append(SolutionCategory.TLE)
-                elif processes[i].exitcode == ExitCodeMLE:
-                    verdicts.append(SolutionCategory.MLE)
+                if processes[i].exitcode == Const.ExitCodeTLE:
+                    verdicts.append(Const.SolutionCategory.TLE)
+                elif processes[i].exitcode == Const.ExitCodeMLE:
+                    verdicts.append(Const.SolutionCategory.MLE)
                 else:
                     logger.debug(
                         "Solution '%s' failed with exitcode %d:\n%s",
                         sourceFilePath.parts[-1], processes[i].exitcode,
                         processes[i].raisedTraceback)
-                    verdicts.append(SolutionCategory.FAIL)
+                    verdicts.append(Const.SolutionCategory.FAIL)
             processes[i].close()
             gc.collect()
             logger.debug("Solution '%s' got %s at test #%d.",
@@ -507,7 +491,7 @@ class AzadCore:
             endTime - startTime)
         logger.info("Answers = %s", producedAnswers)
         verdictCounts = {category: verdicts.count(category)
-                         for category in SolutionCategory}
+                         for category in Const.SolutionCategory}
         logger.info("Solution '%s' verdict: %s",
                     sourceFilePath.parts[-1],
                     {key.value.upper(): verdictCounts[key] for key in verdictCounts})
@@ -554,7 +538,8 @@ class AzadCore:
         if not self.producedAnswers:
             warnings.warn("Answer is not produced yet. Producing first..")
             self.producedAnswers = self.executeSolution(
-                self.solutions[(SolutionCategory.AC,)][0], SolutionCategory.AC, mainAC=True)
+                self.solutions[(Const.SolutionCategory.AC,)][0],
+                Const.SolutionCategory.AC, mainAC=True)
             if not self.producedAnswers:
                 raise AzadError("Answer data cannot be produced")
         i = 0
@@ -570,15 +555,16 @@ class AzadCore:
         """
         Check all solution files.
         """
-        if not self.solutions[(SolutionCategory.AC,)]:
+        if not self.solutions[(Const.SolutionCategory.AC,)]:
             raise AzadError("There is no AC solution")
         logger.info("Checking all solution files..")
         self.producedAnswers = self.executeSolution(
-            self.solutions[(SolutionCategory.AC,)][0], SolutionCategory.AC, mainAC=True)
-        for filePath in self.solutions[(SolutionCategory.AC,)][1:]:
-            self.executeSolution(filePath, SolutionCategory.AC)
+            self.solutions[(Const.SolutionCategory.AC,)][0],
+            Const.SolutionCategory.AC, mainAC=True)
+        for filePath in self.solutions[(Const.SolutionCategory.AC,)][1:]:
+            self.executeSolution(filePath, Const.SolutionCategory.AC)
         for intendedCategories in self.solutions:
-            if intendedCategories == (SolutionCategory.AC,):
+            if intendedCategories == (Const.SolutionCategory.AC,):
                 continue
             else:
                 for filePath in self.solutions[intendedCategories]:

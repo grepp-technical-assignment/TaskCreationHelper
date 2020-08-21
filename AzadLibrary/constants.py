@@ -12,7 +12,7 @@ import typing
 
 
 # Azad Library Version
-AzadLibraryVersion = "0.2.1"
+AzadLibraryVersion = "0.2.2"
 
 
 # Config defaults

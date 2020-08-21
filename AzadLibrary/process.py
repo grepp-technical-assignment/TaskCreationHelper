@@ -446,7 +446,7 @@ def work(*processes: typing.List[BaseAzadProcess],
             if not name:
                 logger.debug("Starting process object %s..", process,)
             else:
-                logger.info("Starting process '%s'..", name,)
+                logger.debug("Starting process '%s'..", name,)
             process.start()
             process.join()
 

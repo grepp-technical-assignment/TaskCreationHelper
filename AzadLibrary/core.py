@@ -40,7 +40,7 @@ from .syntax import (
     cleanGenscript, generatorNamePattern,
     inputFilePattern, outputFilePattern,
 )
-from .misc import (longEndSkip, validateVerdict)
+from .misc import (longEndSkip, validateVerdict, setupLoggers)
 from .filesystem import TempFileSystem
 
 
@@ -73,27 +73,9 @@ class AzadCore:
             else Const.DefaultLoggingFilePath)
         with open(mainLogFilePath, "a") as mainLogFile:
             mainLogFile.write("\n" + "=" * 240 + "\n\n")
-        rootLogger = logging.getLogger()
-        if resetRootLoggerConfig:
-            for oldHandler in rootLogger.handlers[::]:
-                rootLogger.removeHandler(oldHandler)
-        mainFileHandler = logging.handlers.RotatingFileHandler(
-            filename=mainLogFilePath,
-            maxBytes=Const.DefaultLogFileMaxSize,
-            backupCount=Const.DefaultLogFileBackups)
-        mainStreamHandler = logging.StreamHandler(sys.stdout)
-        basefmt = "[%%(asctime)s][%%(levelname)-7s][%%(name)s][L%%(lineno)s] %%(message).%ds"
-        datefmt = "%Y/%m/%d %H:%M:%S"
-        mFHFormatter = logging.Formatter(basefmt % (5000,), datefmt)
-        mSHFormatter = logging.Formatter(basefmt % (120,), datefmt)
-        mainFileHandler.setFormatter(mFHFormatter)
-        mainFileHandler.setLevel(logging.DEBUG)
-        mainStreamHandler.setFormatter(mSHFormatter)
-        mainStreamHandler.setLevel(logging.INFO)
-        rootLogger.addHandler(mainFileHandler)
-        rootLogger.addHandler(mainStreamHandler)
-        rootLogger.setLevel(logging.NOTSET)
-
+        setupLoggers(mainLogFilePath,
+                     replaceOldHandlers=resetRootLoggerConfig,
+                     mainProcess=True, noStreamHandler=False)
         logger.info("Azad Library Version is %s", Const.AzadLibraryVersion)
         logger.info("Current directory is %s", os.getcwd())
         logger.info("Target directory is %s", self.configDirectory)

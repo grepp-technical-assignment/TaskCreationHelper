@@ -4,11 +4,15 @@ This module contains miscellaneous functions.
 
 # Standard libraries
 import random
+import warnings
+import logging
+import sys
 import time
 import typing
+from pathlib import Path
 
 # Azad libraries
-from .constants import (SolutionCategory,)
+from . import constants as Const
 
 
 def barLine(message: str, lineLength: int = 120) -> str:
@@ -50,8 +54,9 @@ def randomName(length: int):
     return "".join(random.choices(candidates, k=length))
 
 
-def validateVerdict(verdictCount: dict,
-                    intendedCategories: typing.List[SolutionCategory]) -> bool:
+def validateVerdict(
+        verdictCount: dict,
+        intendedCategories: typing.List[Const.SolutionCategory]) -> bool:
     """
     Validate verdict with intended categories.
     """
@@ -63,20 +68,75 @@ def validateVerdict(verdictCount: dict,
     # Check
     foundFeasibleCategories = set()  # This should not be empty
     for category in verdictCount:
-        if not isinstance(category, SolutionCategory):
+        if not isinstance(category, Const.SolutionCategory):
             raise TypeError(
                 "Invalid category type %s in verdictCount found" %
                 (type(category),))
         elif verdictCount[category] == 0:
             continue
         elif category not in intendedCategories:  # Tolerate AC only
-            if category is SolutionCategory.AC:
+            if category is Const.SolutionCategory.AC:
                 continue
             else:
                 return False
         else:
             foundFeasibleCategories.add(category)
     return bool(foundFeasibleCategories)
+
+
+def setupLoggers(mainLogFilePath: Path, replaceOldHandlers: bool,
+                 mainProcess: bool = True,
+                 noStreamHandler: bool = False):
+    """
+    Set up loggers for Azad library.
+    """
+    rootLogger = logging.getLogger()
+
+    # Helper function: Closing handler
+    def closeHandler(oldHandler: logging.Handler):
+        oldHandler.flush()
+        oldHandler.close()
+        rootLogger.removeHandler(oldHandler)
+
+    # Cleanup
+    if replaceOldHandlers:
+        for oldHandler in rootLogger.handlers[::]:
+            closeHandler(oldHandler)
+
+    # Main file handler
+    mainFileHandler = logging.handlers.RotatingFileHandler(
+        filename=mainLogFilePath,
+        maxBytes=Const.DefaultLogFileMaxSize,
+        backupCount=Const.DefaultLogFileBackups
+    )
+    MFHformatter = logging.Formatter(
+        Const.DefaultLogBaseFMT % (5000,), Const.DefaultLogDateFMT)
+    mainFileHandler.setFormatter(MFHformatter)
+    mainFileHandler.setLevel(logging.DEBUG)
+    rootLogger.addHandler(mainFileHandler)
+
+    # Main stream handler
+    if not noStreamHandler:
+        if not mainProcess:
+            warnings.warn(
+                "Trying to initialize new stdout handler on non-main process.")
+
+        # Still needed to replace stdout handler
+        if not replaceOldHandlers:
+            for oldHandler in rootLogger.handlers[::]:
+                if isinstance(oldHandler, logging.StreamHandler) and \
+                        oldHandler.stream is sys.stdout:
+                    closeHandler(oldHandler)
+
+        mainStreamHandler = logging.StreamHandler(sys.stdout)
+        MSHformatter = logging.Formatter(
+            Const.DefaultLogBaseFMT % (120,), Const.DefaultLogDateFMT)
+        mainStreamHandler.setFormatter(MSHformatter)
+        mainStreamHandler.setLevel(logging.INFO)
+        rootLogger.addHandler(mainStreamHandler)
+
+    # Final setup
+    rootLogger.setLevel(logging.NOTSET)
 
 
 if __name__ == "__main__":

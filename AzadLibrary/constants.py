@@ -24,10 +24,13 @@ DefaultOutputSyntax = "%02d.out.txt"
 DefaultTimeLimit = 5.0  # seconds
 DefaultMemoryLimit = 1024  # megabytes; Not used
 MaxParameterDimensionAllowed = 2
+
+# Log related
 DefaultLoggingFilePath = "azadlib.log"
 DefaultLogFileMaxSize = 10 * (2 ** 20)  # 10MB
 DefaultLogFileBackups = 5  # blabla.log.%d
-
+DefaultLogBaseFMT = "[%%(asctime)s][%%(levelname)-7s][%%(name)s][L%%(lineno)s] %%(message).%ds"
+DefaultLogDateFMT = "%Y/%m/%d %H:%M:%S"
 
 # Default typestring for all accepted types.
 DefaultTypeStrings = {

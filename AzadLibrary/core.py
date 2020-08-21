@@ -13,6 +13,7 @@ import gc
 import logging
 import logging.handlers
 import warnings
+import statistics
 
 logger = logging.getLogger(__name__)
 
@@ -274,6 +275,7 @@ class AzadCore:
             if not self.inputDatas:
                 self.inputDatas = self.generateInput(validate=False)
             data = self.inputDatas
+        logger.info("Validating input data..")
 
         # Run multiprocessing
         tempInputFiles = [self.tempFileSystem.newTempFile(
@@ -422,10 +424,13 @@ class AzadCore:
         endTime = time.perf_counter()
 
         # Analyze results
+        executionTimes = []
         for i in range(len(self.inputDatas)):
             self.tempFileSystem.pop(tempFiles[i])
             resultJson = processes[i].resultJson
             logger.debug("Analyzing solution process #%d..", i + 1)
+
+            # Analyze exit code
             if processes[i].exitcode == Const.ExitCodeSuccess:
                 # I will implement customized checker,
                 # this is why I separated answer checking from multiprocessing.
@@ -445,11 +450,18 @@ class AzadCore:
                     verdicts.append(Const.SolutionCategory.MLE)
                 else:
                     verdicts.append(Const.SolutionCategory.FAIL)
-            gc.collect()
+
+            # Add execution time for statistics
+            if "executedTime" in resultJson:
+                executionTimes.append(resultJson["executedTime"])
+            elif verdicts[-1] is Const.SolutionCategory.TLE:
+                executionTimes.append(self.limits["time"])
+
+            # Log and clean
             logger.debug("Solution '%s' got %s at test #%d%s",
                          sourceFilePath.parts[-1],
                          verdicts[-1].value.upper(), i + 1,
-                         " in %gs" % (resultJson["executedTime"],)
+                         " in %.3gs" % (resultJson["executedTime"],)
                          if "executedTime" in resultJson else "")
             if verdicts[-1] is Const.SolutionCategory.FAIL:
                 logger.debug(
@@ -457,12 +469,19 @@ class AzadCore:
                     processes[i].exitcode,
                     resultJson["traceback"] if "traceback" in resultJson else "(Traceback is unavailable)")
             processes[i].close()
+            gc.collect()
 
         # Validate verdicts and return produced answers
         logger.info(
             "Executed solution for all data in %g seconds.",
             endTime - startTime)
         logger.info("Answers = %s", producedAnswers)
+        if executionTimes:
+            execTimeAverage = statistics.mean(executionTimes)
+            execTimeQuantiles = statistics.quantiles(executionTimes)
+            execTimeMin, execTimeMax = min(executionTimes), max(executionTimes)
+            logger.info("Execution time: Average %gs, Min = %gs, Q1 = %gs, Q2 = %gs, Q3 = %gs, Max = %gs",
+                        execTimeAverage, execTimeMin, *execTimeQuantiles, execTimeMax)
         verdictCounts = {category: verdicts.count(category)
                          for category in Const.SolutionCategory}
         logger.info("Solution '%s' verdict: %s",

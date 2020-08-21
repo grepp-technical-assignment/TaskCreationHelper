@@ -5,7 +5,6 @@ This module is core of Azad library.
 # Standard libraries
 import json
 import os
-import sys
 from pathlib import Path
 import typing
 import time
@@ -27,9 +26,7 @@ from .errors import (
 from .externalmodule import (
     getExtension, getSourceFileLanguage, prepareExecFunc,
 )
-from .process import (
-    AzadProcessGenerator, AzadProcessSolution, AzadProcessValidator,
-)
+from . import process as Process
 from .iodata import (
     cleanIOFilePath, PGizeData,
     checkDataType, checkDataCompatibility,
@@ -40,7 +37,8 @@ from .syntax import (
     cleanGenscript, generatorNamePattern,
     inputFilePattern, outputFilePattern,
 )
-from .misc import (longEndSkip, validateVerdict, setupLoggers)
+from .misc import (
+    longEndSkip, validateVerdict, setupLoggers, getAvailableCPUCount)
 from .filesystem import TempFileSystem
 
 
@@ -79,6 +77,9 @@ class AzadCore:
         logger.info("Azad Library Version is %s", Const.AzadLibraryVersion)
         logger.info("Current directory is %s", os.getcwd())
         logger.info("Target directory is %s", self.configDirectory)
+        logger.info(
+            "Total %s processors are available.",
+            getAvailableCPUCount())
         logger.debug("Analyzing configuration file..")
 
         # Version
@@ -275,32 +276,24 @@ class AzadCore:
             data = self.inputDatas
 
         # Run multiprocessing
+        tempInputFiles = [self.tempFileSystem.newTempFile(
+            [data[i][varName] for varName in self.parameterNamesSorted],
+            isJson=True
+        ) for i in range(len(data))]
+        processes = [Process.AzadProcessValidator(
+            sourceFilePath, tempInputFiles[i],
+            timelimit=5.0, memlimit=1024) for i in range(len(data))]
         startTime = time.perf_counter()
-        tempInputFiles = [
-            self.tempFileSystem.newTempFile(
-                [data[i][varName] for varName in self.parameterNamesSorted],
-                isJson=True
-            ) for i in range(len(data))
-        ]
-        processes = [
-            AzadProcessValidator(
-                sourceFilePath,
-                tempInputFiles[i],
-                timelimit=5.0, memlimit=1024,
-            ) for i in range(len(data))
-        ]
-        for i in range(len(data)):
-            logger.debug("Validation process #%d started..", i + 1)
-            processes[i].start()
-        for i in range(len(data)):
-            processes[i].join()
-            self.tempFileSystem.pop(tempInputFiles[i])
+        Process.work(*processes, processNamePrefix="Validation")
+        endTime = time.perf_counter()
 
         # Analyze results
         for i in range(len(data)):
+            self.tempFileSystem.pop(tempInputFiles[i])
+            resultJson = processes[i].resultJson
             logger.debug("Analyzing validation process #%d..", i + 1)
             if processes[i].exitcode == Const.ExitCodeSuccess:
-                logger.debug("Ok, validation passed.")
+                pass
             elif processes[i].exitcode == Const.ExitCodeTLE:
                 raise FailedDataValidation(
                     "Validation process #%d got TLE", i + 1)
@@ -309,16 +302,15 @@ class AzadCore:
                     "Validation process #%d got MLE", i + 1)
             else:
                 logger.error(
-                    "Validation process #%d failed with exit code %d:\n%s",
-                    i + 1, processes[i].exitcode, processes[i].raisedTraceback)
+                    "Validation process #%d failed with unknown reason(Exit code %d), traceback:\n%s",
+                    i + 1, processes[i].exitcode,
+                    resultJson["traceback"] if "traceback" in resultJson else "(Traceback is unavailable)")
                 raise FailedDataValidation
             processes[i].close()
             gc.collect()
 
         # Check performance
-        endTime = time.perf_counter()
-        logger.info(
-            "Validated all data in %g seconds.", endTime - startTime)
+        logger.info("Validated all data in %g seconds.", endTime - startTime)
 
     def generateInput(self, validate: bool = True) -> list:
         """
@@ -327,41 +319,34 @@ class AzadCore:
         if not self.genScripts:
             raise ValueError("There is no genscript")
         logger.info("Generating input data..")
-        startTime = time.perf_counter()
 
         # Execute genscripts with multiprocessing.
         # Suppose all genscript lines are validated before.
-        tempOutFilePaths: typing.List[Path] = []
-        processes: typing.List[AzadProcessGenerator] = []
-        for i in range(len(self.genScripts)):
-            tempOutFilePaths.append(self.tempFileSystem.newTempFile())
-            genscript = self.genScripts[i]
-            elements = genscript.split(" ")
-            genFilePath = self.generators[elements[0]]
-            args = elements[1:]
-            logger.debug(
-                "Starting generation process #%d, genscript = '%s'..",
-                i + 1, genscript)
-            processes.append(AzadProcessGenerator(
-                genFilePath, args, self.parameters,
-                outFilePath=tempOutFilePaths[i],
-                timelimit=10.0, memlimit=1024))
-            processes[-1].start()
-        for i in range(len(self.genScripts)):
-            logger.info("Waiting generation process #%d..", i + 1)
-            processes[i].join()
-            self.tempFileSystem.pop(tempOutFilePaths[i])
+        tempOutFilePaths = [self.tempFileSystem.newTempFile()
+                            for _ in range(len(self.genScripts))]
+        processes = [Process.AzadProcessGenerator(
+            self.generators[self.genScripts[i].split(" ")[0]],
+            self.genScripts[i].split(" ")[1:],
+            self.parameters,
+            outFilePath=tempOutFilePaths[i],
+            timelimit=10.0, memlimit=1024
+        ) for i in range(len(self.genScripts))]
+        startTime = time.perf_counter()
+        Process.work(*processes, processNamePrefix="Generation")
+        endTime = time.perf_counter()
 
         # Analyze results
         result = []
         for i in range(len(self.genScripts)):
+            self.tempFileSystem.pop(tempOutFilePaths[i])
+            resultJson = processes[i].resultJson
             logger.debug("Analyzing generation process #%d..", i + 1)
             if processes[i].exitcode == Const.ExitCodeSuccess:
-                result.append(processes[i].returnedValue)
+                result.append(processes[i].resultJson["result"])
             elif processes[i].exitcode == Const.ExitCodeFailedInAVPhase:
                 logger.error(
-                    "Generation process #%d generated wrong data:\n%s",
-                    i + 1, processes[i].raisedTraceback)
+                    "Generation process #%d generated wrong data, traceback:\n%s",
+                    i + 1, resultJson["traceback"])
                 raise FailedDataGeneration
             elif processes[i].exitcode == Const.ExitCodeTLE:
                 raise FailedDataGeneration(
@@ -371,14 +356,14 @@ class AzadCore:
                     "Generation process #%d got MLE", i + 1)
             else:
                 logger.error(
-                    "Generation process #%d failed with unknown reason (Exit code %d):\n%s",
-                    i + 1, processes[i].exitcode, processes[i].raisedTraceback)
+                    "Generation process #%d failed with unknown reason(Exit code %d), traceback:\n%s",
+                    i + 1, processes[i].exitcode,
+                    resultJson["traceback"] if "traceback" in resultJson else "(Traceback is unavailable)")
                 raise FailedDataGeneration
             processes[i].close()
             gc.collect()
 
         # Check performance
-        endTime = time.perf_counter()
         logger.info(
             "Generated all data in %g seconds.", endTime - startTime)
 
@@ -415,9 +400,8 @@ class AzadCore:
         if not self.inputDatas:
             self.inputDatas = self.generateInput(validate=True)
 
-        # Do multiprocessing
+        # Setup basic values
         logger.info("Analyzing solution '%s'..", sourceFilePath)
-        startTime = time.perf_counter()
         verdicts = []
         producedAnswers = []
         tempFiles = [self.tempFileSystem.newTempFile(
@@ -425,23 +409,27 @@ class AzadCore:
                 for varName in self.parameterNamesSorted],
             isJson=True
         ) for i in range(len(self.inputDatas))]
-        processes = [AzadProcessSolution(
+
+        # Run multiprocessing
+        processes = [Process.AzadProcessSolution(
             sourceFilePath, tempFiles[i], self.returnValueInfo,
             timelimit=self.limits["time"], memlimit=self.limits["memory"]
         ) for i in range(len(self.inputDatas))]
+        startTime = time.perf_counter()
+        Process.work(
+            *processes, processNamePrefix="Solution <%s>" %
+            (Path(sourceFilePath).parts[-1],))
+        endTime = time.perf_counter()
+
+        # Analyze results
         for i in range(len(self.inputDatas)):
-            logger.debug("Starting solution process #%d..", i + 1)
-            processes[i].start()
-        for i in range(len(self.inputDatas)):
-            logger.info("Waiting solution process #%d..", i + 1)
-            processes[i].join()
             self.tempFileSystem.pop(tempFiles[i])
-        for i in range(len(self.inputDatas)):
+            resultJson = processes[i].resultJson
             logger.debug("Analyzing solution process #%d..", i + 1)
             if processes[i].exitcode == Const.ExitCodeSuccess:
                 # I will implement customized checker,
                 # this is why I separated answer checking from multiprocessing.
-                thisAnswer = processes[i].returnedValue
+                thisAnswer = processes[i].resultJson["result"]
                 producedAnswers.append(thisAnswer)
                 if mainAC or compareAnswers(
                         self.producedAnswers[i], thisAnswer,
@@ -456,19 +444,21 @@ class AzadCore:
                 elif processes[i].exitcode == Const.ExitCodeMLE:
                     verdicts.append(Const.SolutionCategory.MLE)
                 else:
-                    logger.debug(
-                        "Solution '%s' failed with exitcode %d:\n%s",
-                        sourceFilePath.parts[-1], processes[i].exitcode,
-                        processes[i].raisedTraceback)
                     verdicts.append(Const.SolutionCategory.FAIL)
-            processes[i].close()
             gc.collect()
-            logger.debug("Solution '%s' got %s at test #%d.",
+            logger.debug("Solution '%s' got %s at test #%d%s",
                          sourceFilePath.parts[-1],
-                         verdicts[-1].value.upper(), i + 1)
+                         verdicts[-1].value.upper(), i + 1,
+                         " in %gs" % (resultJson["executedTime"],)
+                         if "executedTime" in resultJson else "")
+            if verdicts[-1] is Const.SolutionCategory.FAIL:
+                logger.debug(
+                    "Failure details: Exit code %d, traceback:\n%s",
+                    processes[i].exitcode,
+                    resultJson["traceback"] if "traceback" in resultJson else "(Traceback is unavailable)")
+            processes[i].close()
 
         # Validate verdicts and return produced answers
-        endTime = time.perf_counter()
         logger.info(
             "Executed solution for all data in %g seconds.",
             endTime - startTime)

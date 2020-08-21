@@ -8,12 +8,14 @@ import typing
 from pathlib import Path
 import time
 import os
-from threading import Thread
+import threading
 import multiprocessing
 import json
 import traceback
 import resource
-import warnings
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Azad libraries
 from .errors import AzadTLE
@@ -25,7 +27,7 @@ from .constants import (
     ExitCodeFailedInLoopPhase,
 )
 from .externalmodule import prepareExecFunc
-from .misc import randomName
+from .misc import (randomName, getAvailableCPUCount)
 from .iodata import (checkDataType, checkDataCompatibility)
 
 # Context of spawning process instead of forking
@@ -79,8 +81,7 @@ class BaseAzadProcess(SpawnContext.Process):
 
         # Misc
         self.outfileCleaned = False
-        self.returnedValue = None
-        self.raisedTraceback = None
+        self.resultJson = None
 
     def getCapsule(self):
         """
@@ -111,7 +112,7 @@ class BaseAzadProcess(SpawnContext.Process):
         """
         self.capsuleResult = None
         self.capsuleException: Exception = None
-        mainThread = Thread(
+        mainThread = threading.Thread(
             target=self.getCapsule(),
             args=self._args, kwargs=self._kwargs,
             daemon=True)
@@ -129,6 +130,8 @@ class BaseAzadProcess(SpawnContext.Process):
                     time.sleep(self.minDT)
         except AzadTLE:  # TLE
             exit(ExitCodeTLE)
+        else:
+            self.executedTime = time.process_time() - startTime
 
     def internalPhaseAfterValidation(self) -> int:
         """
@@ -151,14 +154,20 @@ class BaseAzadProcess(SpawnContext.Process):
             if self.outFilePath:
                 with open(self.outFilePath, "w") as outFile:
                     if self.capsuleException is None:
-                        json.dump(self.capsuleResult, outFile)
+                        json.dump({
+                            "result": self.capsuleResult,
+                            "executedTime": self.executedTime,
+                        }, outFile)
                     else:
                         assert isinstance(self.capsuleException, BaseException)
-                        traceback.print_exception(
-                            type(self.capsuleException),
-                            self.capsuleException,
-                            self.capsuleException.__traceback__,
-                            file=outFile)
+                        json.dump({
+                            "traceback": "".join(traceback.format_exception(
+                                type(self.capsuleException),
+                                self.capsuleException,
+                                self.capsuleException.__traceback__
+                            )),
+                            "executedTime": self.executedTime,
+                        }, outFile)
         except Exception:  # Failed to return data
             exit(ExitCodeFailedToReturnData)
 
@@ -228,10 +237,7 @@ class BaseAzadProcess(SpawnContext.Process):
         # Proceed
         self.outfileCleaned = True
         with open(self.outFilePath, "r") as outFile:
-            if self.exitcode == ExitCodeSuccess:
-                self.returnedValue = json.load(outFile)
-            else:
-                self.raisedTraceback = outFile.read()
+            self.resultJson = json.load(outFile)
         os.remove(self.outFilePath)
 
         # Mark as cleaned
@@ -417,6 +423,47 @@ class AzadProcessSolution(AzadProcessForModules):
             self.returnValueInfo["dimension"])
         assert checkDataCompatibility(
             self.capsuleResult, self.returnValueInfo["type"])
+
+
+def work(*processes: typing.List[BaseAzadProcess],
+         maxConcurrentCount: int = None,
+         processNamePrefix: str = None):
+    """
+    Run given processes, but with bounded amount of concurrent processes.
+    """
+    # Check max concurrent count
+    if maxConcurrentCount is None:
+        maxConcurrentCount = getAvailableCPUCount()
+        if maxConcurrentCount is None:  # Even if CPU count is available?
+            maxConcurrentCount = 4
+    assert maxConcurrentCount > 0
+    boundedSemaphore = threading.BoundedSemaphore(
+        maxConcurrentCount - 1 if maxConcurrentCount > 1 else 1)
+
+    # This function will be used in each process with semaphore.
+    def run(process: BaseAzadProcess, name: str = None):
+        with boundedSemaphore:
+            if not name:
+                logger.debug("Starting process object %s..", process,)
+            else:
+                logger.info("Starting process '%s'..", name,)
+            process.start()
+            process.join()
+
+    # Make threads and run
+    totalThreadCount = len(processes)
+    logTTC = 1
+    while 10 ** logTTC < totalThreadCount:
+        logTTC += 1
+    getName = (lambda i: None if processNamePrefix is None
+               else processNamePrefix + ("_%%0%dd" % (logTTC,) % (i,)))
+    threads = [threading.Thread(target=run, args=(processes[i],),
+                                kwargs={"name": getName(i + 1)})
+               for i in range(totalThreadCount)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
 
 
 if __name__ == "__main__":

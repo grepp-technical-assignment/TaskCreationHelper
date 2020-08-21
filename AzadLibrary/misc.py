@@ -6,6 +6,7 @@ This module contains miscellaneous functions.
 import random
 import warnings
 import logging
+import os
 import sys
 import time
 import typing
@@ -137,6 +138,19 @@ def setupLoggers(mainLogFilePath: Path, replaceOldHandlers: bool,
 
     # Final setup
     rootLogger.setLevel(logging.NOTSET)
+
+
+def getAvailableCPUCount() -> typing.Union[int, None]:
+    """
+    Get available CPU count for this process.
+    If it's not available(like FreeBSD etc),
+    then try to find physical number of CPUs.
+    If physical number of CPUs is undeterminable, return None instead.
+    """
+    try:
+        return len(os.sched_getaffinity(0))
+    except AttributeError:
+        return os.cpu_count()
 
 
 if __name__ == "__main__":

@@ -444,11 +444,15 @@ def work(*processes: typing.List[BaseAzadProcess],
     def run(process: BaseAzadProcess, name: str = None):
         with boundedSemaphore:
             if not name:
-                logger.debug("Starting process object %s..", process,)
+                logger.debug("Starting process object %s..", process)
             else:
-                logger.debug("Starting process '%s'..", name,)
+                logger.debug("Starting process '%s'..", name)
             process.start()
             process.join()
+            if not name:
+                logger.debug("Finishing process object %s..", process)
+            else:
+                logger.debug("Finishing process '%s'..", name)
 
     # Make threads and run
     totalThreadCount = len(processes)

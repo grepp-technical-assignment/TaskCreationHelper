@@ -13,7 +13,8 @@ import atexit
 if __name__ == "__main__":
 
     # Azad library
-    from AzadLibrary import AzadCore, StartingConfigState
+    from AzadLibrary import AzadCore
+    from AzadLibrary.constants import StartingConfigState, DefaultStatement
     from AzadLibrary.misc import barLine
 
     subcommand = argv[1] if len(argv) > 1 else "help"
@@ -39,6 +40,7 @@ List of subcommands:
         print(helpStr)
 
     elif subcommand == "init":  # Interactive initialization
+
         print("Let's initialize new problem folder.")
         print("Current location is \"%s\"." % (os.getcwd(),))
         folderNamePattern = re.compile("[A-Za-z0-9_]+(/[A-Za-z0-9_]+)*")
@@ -58,8 +60,12 @@ List of subcommands:
         problemName = input("Enter problem name(optional): ").strip()
         startInformation["name"] = problemName if problemName else "Untitled"
         os.makedirs(folderName)
+
+        # Write basic files
         with open(Path(folderName) / "config.json", "w") as configFile:
             json.dump(startInformation, configFile, indent=4)
+        with open(Path(folderName) / "statement.md", "w") as statementFile:
+            statementFile.write(DefaultStatement)
 
     elif subcommand in ("full", "produce_io"):  # Actual run process
 

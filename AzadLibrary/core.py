@@ -284,7 +284,7 @@ class AzadCore:
         ) for i in range(len(data))]
         processes = [Process.AzadProcessValidator(
             sourceFilePath, tempInputFiles[i],
-            timelimit=5.0, memlimit=1024) for i in range(len(data))]
+            timelimit=10.0, memlimit=1024) for i in range(len(data))]
         startTime = time.perf_counter()
         Process.work(*processes, processNamePrefix="Validation")
         endTime = time.perf_counter()

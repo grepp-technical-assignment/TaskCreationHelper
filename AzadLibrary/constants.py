@@ -22,7 +22,7 @@ DefaultIOPath = "IO"
 DefaultInputSyntax = "%02d.in.txt"
 DefaultOutputSyntax = "%02d.out.txt"
 DefaultTimeLimit = 5.0  # seconds
-DefaultMemoryLimit = 1024  # megabytes; Not used
+DefaultMemoryLimit = 1024  # megabytes
 MaxParameterDimensionAllowed = 2
 
 # Log related
@@ -65,68 +65,83 @@ def __IODataTypesInfo_FloatStrize(x: typing.Union[float, Decimal, Fraction]):
     return result
 
 
+class IOVariableTypes(Enum):
+    """
+    Enumeration of I/O variable types in task.
+    """
+    INT = "int"
+    LONG = "long"
+    FLOAT = "float"
+    DOUBLE = "double"
+    STRING = "str"
+    BOOL = "bool"
+
+
+# Indirect names of IOVariableTypes.
+IODataTypesIndirect = {
+    IOVariableTypes.INT: {"integer", "int32"},
+    IOVariableTypes.LONG: {"long long", "long long int", "int64"},
+    IOVariableTypes.FLOAT: {"float32"},
+    IOVariableTypes.DOUBLE: {"real", "float64"},
+    IOVariableTypes.STRING: {"string", "char*"},
+    IOVariableTypes.BOOL: {"boolean"}
+}
+for _iovt in IOVariableTypes:
+    assert _iovt in IODataTypesIndirect
+
+
+def getIOVariableType(s: str) -> IOVariableTypes:
+    """
+    Get IOVariableType of given string.
+    """
+    for iovt in IOVariableTypes:
+        if s == iovt.value or s in IODataTypesIndirect[iovt]:
+            return iovt
+    raise ValueError("There is no such IODataType '%s'" % (s,))
+
+
 # Information of I/O data types.
-# If "constraint" is not in subdict,
-#       then that type doesn't have any constraints.
 IODataTypesInfo = {
-    "int": {
+    IOVariableTypes.INT: {
         "pytypes": (int,),
         "constraint": (lambda x: -(2**31) <= x <= 2**31 - 1),
         "strize": (lambda x: "%d" % (x,)),
     },
-    "long long": {
+    IOVariableTypes.LONG: {
         "pytypes": (int,),
         "constraint": (lambda x: -(2**63) <= x <= 2**63 - 1),
         "strize": (lambda x: "%d" % (x,)),
     },
-    "float": {
+    IOVariableTypes.FLOAT: {
         "pytypes": (float, Decimal, Fraction, int),
         "constraint": (lambda x: 1.175494351e-38 <= abs(x) <= 3.402823466e38 or x == 0),
         "strize": __IODataTypesInfo_FloatStrize,
     },
-    "double": {
+    IOVariableTypes.DOUBLE: {
         "pytypes": (float, Decimal, Fraction, int),
         "constraint": (lambda x: float_info.min <= abs(x) <= float_info.max or x == 0),
         "strize": __IODataTypesInfo_FloatStrize,
     },
-    "str": {
+    IOVariableTypes.STRING: {
         "pytypes": (str,),
         "constraint": __IODataTypesInfo_StringConstraints,
         "strize": (lambda x: "\"%s\"" % (x.replace('"', '\\"'),)),
     },
-    "bool": {
+    IOVariableTypes.BOOL: {
         "pytypes": (bool, int),
         "constraint": (lambda x: isinstance(x, bool) or (x in (0, 1))),
         "strize": (lambda x: "true" if x else "false"),
     }
 }
-IODataTypesInfo["integer"] = IODataTypesInfo["int"]
-IODataTypesInfo["long"] = IODataTypesInfo["long long"]
-IODataTypesInfo["long long int"] = IODataTypesInfo["long long"]
-IODataTypesInfo["real"] = IODataTypesInfo["double"]
-IODataTypesInfo["string"] = IODataTypesInfo["str"]
-IODataTypesInfo["boolean"] = IODataTypesInfo["bool"]
-
-# Setup assertion
-for typestr in IODataTypesInfo:
-    dtinfo = IODataTypesInfo[typestr]
-    if not isinstance(dtinfo, dict):
-        raise TypeError(
-            "IODataTypesInfo setup is wrong. Look %s." % (typestr,))
-    elif not isinstance(dtinfo["pytypes"], (list, tuple)):
-        raise TypeError(
-            "IODataTypesInfo setup is wrong. Look %s, pytypes is wrong." % (typestr,))
-    for t in dtinfo["pytypes"]:
-        if not isinstance(t, type):
-            raise TypeError(
-                "IODataTypesInfo setup is wrong. Look %s, there is '%s' in pytypes." %
-                (typestr, t))
-    if not callable(dtinfo["constraint"]):
-        raise ValueError(
-            "IODataTypesInfo setup is wrong. Look %s, constraint is not callable." % (typestr,))
-    elif not callable(dtinfo["strize"]):
-        raise ValueError(
-            "IODataTypesInfo setup is wrong. Look %s, strize is not callable." % (typestr,))
+for _typestr in IODataTypesInfo:
+    _dtinfo = IODataTypesInfo[_typestr]
+    assert isinstance(_dtinfo, dict)
+    assert set(_dtinfo.keys()) == {"pytypes", "constraint", "strize"}
+    assert isinstance(_dtinfo["pytypes"], (list, tuple))
+    assert callable(_dtinfo["constraint"])
+    assert callable(_dtinfo["strize"])
+    for _t in _dtinfo["constraint"]:
+        assert isinstance(_t, type)
 
 
 class SolutionCategory(Enum):

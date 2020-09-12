@@ -257,15 +257,6 @@ ExitCodeFailedInBPPhase = 37  # Failed in before-preparation phase
 ExitCodeFailedInLoopPhase = 38  # Failed in looping phase
 
 
-# Target types for primitive data protocol
-PrimitiveDataProtocolTargetTypes = typing.Union[
-    int, float, bool, None,
-    str, bytes, bytearray,
-    list, tuple, set, frozenset,
-    dict
-]
-
-
 # Sourcefile Types
 class SourceFileType(Enum):
     """

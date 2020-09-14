@@ -59,8 +59,8 @@ class TempFileSystem:
         raise OSError("Couldn't find feasible file name")
 
     def newTempFile(self, content: typing.Union[str, bytes] = None,
-                    extension: str = "temp", randomNameLength: int = 60,
-                    isBytes: bool = False) -> Path:
+                    filename: str = None, extension: str = "temp",
+                    randomNameLength: int = 60, isBytes: bool = False) -> Path:
         """
         Create file and return path.
         - If `content` is not given, then empty file will be created.
@@ -68,7 +68,7 @@ class TempFileSystem:
         """
         # Basic conditions
         if self.closed:
-            raise IOError("File system closed")
+            raise OSError("File system closed")
 
         # Content handling; This is independent on thread
         if content is None:
@@ -84,8 +84,15 @@ class TempFileSystem:
 
         # Actual file creation
         with self.semaphore:
-            tempFilePath = self.__findFeasiblePath(
-                extension=extension, randomNameLength=randomNameLength)
+            if filename is not None:
+                tempFilePath = self.basePath / \
+                    (filename + ("." + extension) if extension else "")
+                if tempFilePath in self.tempFiles:
+                    raise OSError(
+                        "Filename '%s' already exists" % (tempFilePath,))
+            else:
+                tempFilePath = self.__findFeasiblePath(
+                    extension=extension, randomNameLength=randomNameLength)
             self.tempFiles.add(tempFilePath)
             with open(tempFilePath, "wb" if isBytes else "w") as tempFile:
                 if content is not None:

@@ -9,7 +9,6 @@ import os
 import shutil
 import atexit
 import threading
-import json
 import logging
 
 # Azad libraries
@@ -20,95 +19,124 @@ logger = logging.getLogger(__name__)
 
 class TempFileSystem:
     """
-    This class is used to manage temporary files.
-    This is not threadsafe.
+    This class is used to manage temporary files with thread safety.
     """
 
     def __init__(self, basePath: typing.Union[str, Path]):
+
+        # Make new temporary folder
         while True:
             self.basePath: Path = Path(basePath) / \
                 ("tempfilesystem_" + randomName(20))
             if not self.basePath.exists():
                 break
         self.basePath.mkdir()
-        self.tempfiles: typing.Set[Path] = set()
+
+        # Setup attributes
+        self.tempFiles: typing.Set[Path] = set()
+        self.semaphore = threading.BoundedSemaphore()
         self.closed = False
-        atexit.register(self.close)
+
+        # Extra
+        atexit.register(self.close, force=True)
         logger.info("Temporary filesystem based on '%s' is created.",
                     self.basePath)
 
+    def __findFeasiblePath(self, extension: str = "temp",
+                           randomNameLength: int = 60) -> str:
+        """
+        Find any feasible file name to create new one.
+        """
+        iteration = 0
+        while iteration >= 1000:
+            tempFileName = "tmp_" + randomName(randomNameLength) + \
+                ("." + extension if extension else "")
+            tempFilePath = self.basePath / tempFileName
+            if tempFilePath not in self.tempFiles:
+                return tempFilePath
+            else:
+                iteration += 1
+        raise OSError("Couldn't find feasible file name")
+
     def newTempFile(self, content: typing.Union[str, bytes] = None,
-                    extension: str = "temp", randomLength: int = 60,
-                    b: bool = False, isJson: bool = False) -> Path:
+                    extension: str = "temp", randomNameLength: int = 60,
+                    isBytes: bool = False) -> Path:
         """
         Create file and return path.
         - If `content` is not given, then empty file will be created.
-        - If `b` is True, then file will be written in binary mode.
-        - If `isJson` is True, then content will be dumped into file by json module.
+        - If `isBytes` is True, then file will be written in binary mode.
         """
+        # Basic conditions
         if self.closed:
             raise IOError("File system closed")
-        elif b and isJson:
-            raise ValueError("Trying json mode and binary mode together")
 
-        # Content handling
-        if content is None or isJson:
+        # Content handling; This is independent on thread
+        if content is None:
             pass
-        elif b:
-            if isinstance(content, (bytes, bytearray)):
-                pass
-            else:
+        elif isBytes:  # Encode content
+            if not isinstance(content, (bytes, bytearray)):
                 content = str(content).encode()
-        else:
+        else:  # Decode content
             if isinstance(content, (bytes, bytearray)):
                 content = content.decode()
             else:
                 content = str(content)
 
-        # Find feasible filename
-        while True:
-            tempFilePath = self.basePath / \
-                ("tmp_" + randomName(randomLength) + "." + extension)
-            if tempFilePath not in self.tempfiles:
-                break
-
         # Actual file creation
-        self.tempfiles.add(tempFilePath)
-        with open(tempFilePath, "w" if not b else "wb") as tempFile:
-            if content is not None:
-                if isJson:
-                    json.dump(content, tempFile)
-                else:
+        with self.semaphore:
+            tempFilePath = self.__findFeasiblePath(
+                extension=extension, randomNameLength=randomNameLength)
+            self.tempFiles.add(tempFilePath)
+            with open(tempFilePath, "wb" if isBytes else "w") as tempFile:
+                if content is not None:
                     tempFile.write(content)
-        return tempFilePath
+            return tempFilePath
 
     def pop(self, filePath: typing.Union[str, Path], b: bool = False) \
-            -> typing.Union[bytes, str]:
+            -> typing.Union[bytes, str, None]:
         """
         Read a content from given temp file and remove it.
         If given temp file is already deleted, then tolerate it instead of raising `FileNotFoundError`.
         - `b` determines rb mode(True) or r mode(False, default).
         """
-        if filePath not in self.tempfiles:
-            raise FileNotFoundError(
-                "Couldn't find '%s' among registered temp files" % (filePath,))
-        try:
-            with open(filePath, "r" if not b else "rb") as tempfile:
-                result = tempfile.read()
-            os.remove(filePath)
-        except FileNotFoundError:
-            pass
-        else:
-            return result
+        # Basic conditions
+        if self.closed:
+            raise IOError("File system closed")
 
-    def close(self):
+        # Erase the file
+        with self.semaphore:
+            if filePath not in self.tempFiles:
+                raise FileNotFoundError(
+                    "Couldn't find '%s' among registered temp files" % (filePath,))
+            try:
+                with open(filePath, "r" if not b else "rb") as tempfile:
+                    result = tempfile.read()
+                os.remove(filePath)
+            except FileNotFoundError:
+                pass
+            else:
+                return result
+
+    def close(self, force: bool = False):
         """
         Shutdown this temp file system and remove all associated files.
         """
+        # Already closed
         if self.closed:
             return
-        logger.info("Temporary filesystem based on '%s' is closing..",
-                    self.basePath)
-        self.closed = True
-        self.tempfiles.clear()
-        shutil.rmtree(self.basePath)
+
+        # Actual termination process
+        def doIt():
+            logger.info(
+                "Temporary filesystem based on '%s' is closing..",
+                self.basePath)
+            self.closed = True
+            self.tempFiles.clear()
+            shutil.rmtree(self.basePath)
+
+        # Forced or not?
+        if force:
+            doIt()
+        else:
+            with self.semaphore:
+                doIt()

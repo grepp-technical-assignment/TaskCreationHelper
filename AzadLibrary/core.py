@@ -477,11 +477,14 @@ class AzadCore:
             endTime - startTime)
         logger.info("Answers = %s", producedAnswers)
         if executionTimes:
-            execTimeAverage = statistics.mean(executionTimes)
-            execTimeQuantiles = statistics.quantiles(executionTimes)
-            execTimeMin, execTimeMax = min(executionTimes), max(executionTimes)
-            logger.info("Execution time: Average %gs, Min = %gs, Q1 = %gs, Q2 = %gs, Q3 = %gs, Max = %gs",
-                        execTimeAverage, execTimeMin, *execTimeQuantiles, execTimeMax)
+            try:
+                execTimeAverage = statistics.mean(executionTimes)
+                execTimeQuantiles = statistics.quantiles(executionTimes)
+                execTimeMin, execTimeMax = min(executionTimes), max(executionTimes)
+                logger.info("Execution time: Average %gs, Min = %gs, Q1 = %gs, Q2 = %gs, Q3 = %gs, Max = %gs",
+                            execTimeAverage, execTimeMin, *execTimeQuantiles, execTimeMax)
+            except statistics.StatisticsError:
+                pass
         verdictCounts = {category: verdicts.count(category)
                          for category in Const.SolutionCategory}
         logger.info("Solution '%s' verdict: %s",

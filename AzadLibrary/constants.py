@@ -247,14 +247,7 @@ class LogLevel(Enum):
     Debug = "Debug"
 
 
-# List of exit codes for multiprocessing
-ExitCodeSuccess = 0
-ExitCodeTLE = 33
-ExitCodeMLE = 34
-ExitCodeFailedToReturnData = 35
-ExitCodeFailedInAVPhase = 36  # Failed in after-validation phase
-ExitCodeFailedInBPPhase = 37  # Failed in before-preparation phase
-ExitCodeFailedInLoopPhase = 38  # Failed in looping phase
+    """
 
 
 # Sourcefile Types

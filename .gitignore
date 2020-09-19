@@ -29,6 +29,9 @@ bin/
 # Test folders
 **/test/
 
+# External resources
+AzadLibrary/resources/external
+
 # Private data
 *.pem
 *.pub

@@ -49,9 +49,9 @@ def randomName(length: int):
     Remind that calling this will reset random seed to arbitrary number.
     """
     random.seed(time.monotonic_ns())
-    alphabets = "abcdefghijklmnopqrstuvwxyz"
-    numbers = "0123456789"
-    candidates = alphabets.lower() + alphabets.upper() + numbers
+    lowercases = "".join(chr(ord('a') + x) for x in range(26))
+    numbers = "".join(chr(ord('0') + x) for x in range(10))
+    candidates = lowercases + lowercases.upper() + numbers
     return "".join(random.choices(candidates, k=length))
 
 

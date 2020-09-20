@@ -12,7 +12,7 @@ import threading
 import logging
 
 # Azad libraries
-from .misc import (randomName,)
+from .misc import (randomName, isExistingFile)
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +23,10 @@ class TempFileSystem:
     """
 
     def __init__(self, basePath: typing.Union[str, Path]):
+
+        # BasePath should exists
+        if not isExistingFile(basePath):
+            raise NotADirectoryError("Invalid path '%s'" % (basePath,))
 
         # Make new temporary folder
         while True:
@@ -46,6 +50,7 @@ class TempFileSystem:
                            randomNameLength: int = 60) -> str:
         """
         Find any feasible file name to create new one.
+        This method is not threadsafe.
         """
         iteration = 0
         while iteration >= 1000:
@@ -70,7 +75,7 @@ class TempFileSystem:
         if self.closed:
             raise OSError("File system closed")
 
-        # Content handling; This is independent on thread
+        # Content handling; This is independent so can be executed directly
         if content is None:
             pass
         elif isBytes:  # Encode content
@@ -86,10 +91,10 @@ class TempFileSystem:
         with self.semaphore:
             if filename is not None:
                 tempFilePath = self.basePath / \
-                    (filename + ("." + extension) if extension else "")
+                    (filename + (("." + extension) if extension else ""))
                 if tempFilePath in self.tempFiles:
                     raise OSError(
-                        "Filename '%s' already exists" % (tempFilePath,))
+                        "Filename '%s' already exists" % (tempFilePath.name,))
             else:
                 tempFilePath = self.__findFeasiblePath(
                     extension=extension, randomNameLength=randomNameLength)
@@ -97,7 +102,27 @@ class TempFileSystem:
             with open(tempFilePath, "wb" if isBytes else "w") as tempFile:
                 if content is not None:
                     tempFile.write(content)
-            return tempFilePath
+        return tempFilePath
+
+    def copy(self, origin: typing.Union[str, Path],
+             destination: str = None, extension: str = "temp",
+             randomNameLength: int = 60) -> Path:
+        """
+        Copy the external file into current temp file system.
+        """
+        # Since we read only, it's ok to read this file directly
+        with self.semaphore:
+            if destination is not None:
+                tempFilePath = self.basePath / \
+                    (destination + (("." + extension) if extension else ""))
+                if tempFilePath in self.tempFiles:
+                    raise OSError(
+                        "Filename '%s' already exists" % (tempFilePath.name,))
+            else:
+                tempFilePath = self.__findFeasiblePath(
+                    extension=extension, randomNameLength=randomNameLength)
+            shutil.copyfile(origin, tempFilePath)
+        return tempFilePath
 
     def pop(self, filePath: typing.Union[str, Path], b: bool = False) \
             -> typing.Union[bytes, str, None]:

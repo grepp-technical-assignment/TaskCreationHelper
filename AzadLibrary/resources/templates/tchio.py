@@ -21,10 +21,7 @@ def parseSingle(line: str, targetType: type) \
         raise TypeError("Unknown type t(%s)" % (targetType,))
 
 
-def parseMulti(lines: typing.Iterator[str], targetType: type, dimension: int) \
-        -> typing.Union[int, str, bool, float,
-                        typing.List[int], typing.List[str],
-                        typing.List[bool], typing.List[float]]:
+def parseMulti(lines: typing.Iterator[str], targetType: type, dimension: int):
     """
     Parse multiple lines with given target type and dimension.
     """

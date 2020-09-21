@@ -1,0 +1,51 @@
+# Standard libraries
+import sys
+import traceback
+from pathlib import Path
+
+# TCH I/O
+import $PythonIOHelperPath as TCHIO
+
+# Solution module
+from $SolutionPath import solution
+
+
+def main(*argv):
+
+    # Get input and parse
+    def inputEndless():
+        while True:
+            yield input()
+    inputLineIterator = inputEndless()
+    inputValues = {}
+    try:
+        $GetParameters
+    except (EOFError, TypeError) as err:
+        TCHIO.printException(err)
+        exit($ExitCodeInputParsingError)
+
+    # Execution
+    try:
+        result = solution(**inputValues)
+    except MemoryError:
+        exit($ExitCodeMLE)
+    except Exception as err:
+        TCHIO.printException(err)
+        exit($ExitCodeSolutionFailed)
+
+    # Print out
+    resultType, resultDimension = ($resultInfo)
+    try:
+        with open(Path(argv[0]), "w") as outfile:
+            TCHIO.printData(result, resultType, 
+                resultDimension, file = outfile)
+    except (TypeError, AssertionError, ValueError) as err:
+        TCHIO.printException(err)
+        exit($ExitCodeWrongTypeGenerated)
+
+    # Success
+    exit($ExitCodeSuccess)
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

@@ -1,0 +1,56 @@
+# Standard libraries
+import sys
+import traceback
+from pathlib import Path
+import random, hashlib # For fixed seed
+
+# TCH I/O
+import $PythonIOHelperPath as TCHIO
+
+# Generator module
+from $GeneratorPath import generate
+
+
+def main(*argv):
+
+    # Fix seed
+    genscript = argv[1:]
+    hashValue = hashlib.sha256("|".join(genscript).encode()).hexdigest()
+    random.seed(hashValue)
+
+    # Execution
+    try:
+        generated: dict = generate(genscript)
+    except MemoryError as err:
+        TCHIO.printException(err)
+        exit($ExitCodeMLE)
+    except Exception as err:
+        TCHIO.printException(err)
+        exit($ExitCodeGeneratorFailed)
+    
+    # Print out
+    with open(Path(argv[0]), "w") as outfile:
+        try:
+            $PrintParameters
+        except KeyError as err:
+            TCHIO.printException(err)
+            exit($ExitCodeGeneratorFailed)
+        except (TypeError, AssertionError, ValueError) as err:
+            TCHIO.printException(err)
+            exit($ExitCodeGeneratorFailed)
+
+    # Check if there is any extra parameter generated
+    try:
+        if generated:
+            raise ValueError("Generator generated extra parameters: [%s]" 
+                % ("".join(generated.keys()),))
+    except ValueError as err:
+        TCHIO.printException(err)
+        exit($ExitCodeGeneratorFailed)
+
+    # Success
+    exit($ExitCodeSuccess)
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

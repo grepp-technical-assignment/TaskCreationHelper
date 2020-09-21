@@ -1,0 +1,38 @@
+# Standard libraries
+import sys
+import traceback
+
+# TCH I/O
+import $PythonIOHelperPath as TCHIO
+
+# Validator module
+from $ValidatorPath import validate
+
+
+def main(*argv):
+
+    # Get input and parse
+    def inputEndless():
+        while True:
+            yield input()
+    inputLineIterator = inputEndless()
+    inputValues = {}
+    try:
+        $GetParameters
+    except (EOFError, TypeError) as err:
+        TCHIO.printException(err)
+        exit($ExitCodeInputParsingError)
+
+    # Validate
+    try:
+        validate(**inputValues)
+    except Exception as err:
+        TCHIO.printException(err)
+        exit($ExitCodeValidatorFailed)
+
+    # Success
+    exit($ExitCodeSuccess)
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

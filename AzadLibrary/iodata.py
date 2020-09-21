@@ -10,12 +10,7 @@ from decimal import Decimal
 from fractions import Fraction
 
 # Azad libraries
-from .constants import (
-    DefaultFloatPrecision,
-    IODataTypesInfo, DefaultTypeStrings,
-    MaxParameterDimensionAllowed
-)
-from .errors import FailedDataValidation
+from . import constants as Const, errors as Errors
 
 
 def cleanIOFilePath(path: typing.Union[str, Path],
@@ -32,138 +27,64 @@ def cleanIOFilePath(path: typing.Union[str, Path],
                 break
 
 
-def PGizeData(data, typestr: str) -> str:
+def yieldLines(file: typing.IO[str]) -> typing.Iterator[str]:
+    """
+    Read and yield each line until to reach end of file.
+    """
+    while True:
+        line: str = file.readline()
+        if line == '':
+            break
+        yield line.replace("\n", "")
+
+
+def PGizeData(data, iovt: Const.IOVariableTypes) -> str:
     """
     Transfer data into Programmers-compatible string.
     """
     if isinstance(data, (list, tuple)):
-        return "[%s]" % (",".join(PGizeData(d, typestr) for d in data),)
+        return "[%s]" % (",".join(PGizeData(d, iovt) for d in data),)
     else:
-        return IODataTypesInfo[typestr]["strize"](data)
+        return Const.IODataTypesInfo[iovt]["strize"](data)
 
 
-def checkPrecision(a: float, b: float,
-                   precision: float = DefaultFloatPrecision):
+def parseSingle(line: str, targetType: Const.IOVariableTypes) \
+        -> typing.Union[int, float, bool]:
     """
-    Check similarity between two float numbers with given precision.
+    Parse the given line with given target type.
     """
-    if precision <= 0:
-        raise ValueError("Non-positive precision %f given" % (precision,))
-    elif abs(a) <= 1e-10:
-        return abs(a - b) <= precision
+    if targetType in (Const.IOVariableTypes.INT, Const.IOVariableTypes.LONG):
+        return int(line)
+    elif targetType in (Const.IOVariableTypes.FLOAT, Const.IOVariableTypes.DOUBLE):
+        return float(line)
+    elif targetType is Const.IOVariableTypes.BOOL:
+        if line not in ("true", "false"):
+            raise ValueError
+        return line == "true"
     else:
-        return abs(a - b) <= precision or abs((a - b) / a) <= precision
+        raise TypeError("Unknown type t(%s) for single parse" % (targetType,))
 
 
-def checkDataCompatibility(data, targetType: typing.Union[str, type]) -> bool:
+def parseMulti(lines: typing.Iterator[str],
+               targetType: Const.IOVariableTypes, dimension: int):
     """
-    Check data compatibilities.
-    For integers, it should be in range of int32 or int64.
-    For real numbers, it should be in range of IEEE float/double standard.
-    For string, it should not contain any wide characters(wchar_t).
+    Parse multiple lines with given target type and dimension.
+    This may raise ValueError.
     """
-    # Check each element's data range
-    if isinstance(data, (list, tuple)):
-        for element in data:
-            if not checkDataCompatibility(element, targetType):
-                return False
-        return True
-
-    # Clean datatype
-    elif isinstance(targetType, type):  # Types should be converted to typestr
-        targetType = DefaultTypeStrings[targetType]
-    elif not isinstance(targetType, str):
-        raise TypeError
-
-    # Filtering unknown target type
-    if targetType not in IODataTypesInfo:
-        raise ValueError("Given target type '%s' is unknown" % (targetType,))
-    # Given data is not matching to target type
-    elif not isinstance(data, IODataTypesInfo[targetType]["pytypes"]):
-        raise TypeError("Data type is %s but wanted to match %s(%s)" %
-                        (type(data), targetType, IODataTypesInfo[targetType]["pytypes"]))
-    # Check constraints
-    elif "constraint" in IODataTypesInfo[targetType]:
-        return IODataTypesInfo[targetType]["constraint"](data)
-    else:
-        return True
-
-
-def checkDataType(data, variableType: typing.Union[str, type, typing.List[type]],
-                  dimension: int) -> bool:
-    """
-    Check data type and dimension. Return true if given data is valid.
-    """
-    if isinstance(variableType, str):  # Auto conversion
-        variableType = IODataTypesInfo[variableType]["pytypes"]
     if dimension == 0:
-        return isinstance(data, variableType)
-    elif not isinstance(data, (list, tuple)):
-        return False
-    for element in data:
-        if not checkDataType(element, variableType, dimension - 1):
-            return False
-    return True
-
-
-def compareAnswers(*answers, floatPrecision: float = DefaultFloatPrecision):
-    """
-    Compare answers and return boolean value.
-    Don't confuse, this function validates `(answer[1] == answer[2] == ... == answer[n])`.
-    Consider first answer argument as main answer.
-    """
-    l = len(answers)
-    if l < 2:
-        raise ValueError("%d answer given to be compared. (Too small)" % (l,))
-
-    # Dimension 1+
-    if isinstance(answers[0], (list, tuple)):  # Iterable
-        for i in range(l):
-            if not isinstance(answers[i], (list, tuple)) or \
-                    len(answers[0]) != len(answers[i]):
-                return False
-        for i in range(len(answers[0])):
-            if not compareAnswers(*[answer[i] for answer in answers]):
-                return False
-        return True
-
-    # Dimension 0
-    else:
-        for i in range(1, l):  # Type checking
-            if not isinstance(answers[i], type(answers[0])):
-                return False
-        if isinstance(answers[0],
-                      (float, Decimal, Fraction)):  # Float: Precision checking
-            for i in range(1, l):
-                if not checkPrecision(
-                        answers[0], answers[i], floatPrecision):
-                    return False
-        elif isinstance(answers[0], (int, bool, str)):  # General cases
-            for i in range(1, l):
-                if answers[0] != answers[i]:
-                    return False
+        if targetType is not Const.IOVariableTypes.STRING:
+            result = parseSingle(next(lines), targetType)
         else:
-            raise TypeError("Invalid answer type.")
-        return True
-
-
-def guessDataType(
-    data: typing.Union[int, float, str, list, tuple],
-    dimension: int = None, validateConstraints: bool = False) \
-        -> typing.Tuple[str, int]:
-    """
-    Guess the object's datatype.
-    If result is ambigious, then the lowest possible dimension
-    and arbitrary possible type will be chosen.
-    If there isn't any correct type and dimension, it will raise FailedDataValidation.
-    """
-    for dimension in (range(MaxParameterDimensionAllowed + 1)
-                      if dimension is None else [dimension]):
-        for varType in IODataTypesInfo:
-            if checkDataType(data, varType[::], dimension):
-                if not validateConstraints or \
-                        checkDataCompatibility(data, varType[::]):
-                    return (varType, dimension)
+            length = parseSingle(next(lines), Const.IOVariableTypes.INT)
+            result = "".join(chr(parseSingle(next(lines), Const.IOVariableTypes.INT))
+                             for _ in range(length))
+        if not Const.IODataTypesInfo[targetType]["constraint"](result):
+            raise ValueError("Parsed data failed on constraint func")
+        return result
     else:
-        raise FailedDataValidation(
-            "None of (type, dimension) could validate it.")
+        size: int = parseSingle(next(lines), int)
+        result = [parseMulti(lines, targetType, dimension - 1)
+                  for _ in range(size)]
+        if dimension > 1 and len(set(len(element) for element in result)) > 1:
+            raise ValueError("Generated non-rectangle array")
+        return result

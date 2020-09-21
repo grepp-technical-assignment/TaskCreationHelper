@@ -38,47 +38,33 @@ genscriptLinePattern = re.compile(
     "%s( \\S+)*" % (generatorNamePattern.pattern,))
 genscriptCommentPattern = re.compile("()|((#|(//)).*)")
 
+# File extension syntax
+extensionSyntax = re.compile("[a-zA-Z][a-zA-Z0-9]*")
 
-def cleanGenscript(
-        genscript: typing.List[str], generatorNames: typing.Iterable) -> typing.List[str]:
+
+def cleanGenscript(genscript: str, generatorNames: typing.Iterable) -> \
+        typing.Union[typing.List[str], None]:
     """
-    Validate given genscript with generator names.
-    If a syntax error found, raise SyntaxError.
+    Validate given genscript with existing generator names.
+    Assume that given generator names are already verified.
+    If given genscript is comment, return None.
+    Else if any syntax error found, raise SyntaxError.
+    Otherwise, return splitted version of genscript.
     """
-    generatorNames = list(generatorNames)
-    result = []
-    i = 0
-    for line in genscript:
-        i += 1
-        if not isinstance(line, str):
-            raise TypeError(
-                "Invalid type %s given for genscript line" % (type(line),))
-        elif genscriptCommentPattern.fullmatch(line):
-            continue  # Comment should pass
-        elif not genscriptLinePattern.fullmatch(line):
-            raise SyntaxError(
-                "Genscript line %d '%s' doesn't match syntax" % (i, line))
-        generatorName = line.split(" ")[0]
-        if generatorName not in generatorNames:
-            raise SyntaxError("Genscript line %d '%s' targetted non-existing generator %s" %
-                              (i, line, generatorName))
-        result.append(line)
-    return result
+    genscript = genscript.strip()
+    if genscriptCommentPattern.fullmatch(genscript):  # Comment
+        return None
+    elif not genscriptLinePattern.fullmatch(genscript):
+        raise SyntaxError(
+            "Genscript '%s' does not satisfy syntax" % (genscript,))
+    generatorName = genscript.split(" ")[0]
+    if generatorName not in generatorNames:
+        raise SyntaxError("Unknown generator name '%s' in genscript" %
+                          (generatorName,))
+    else:
+        return [x for x in genscript.split(" ") if x]
 
 
 if __name__ == "__main__":  # Interactive testing
 
-    def interactive_test(pattern: str, name: str):
-        line = input("Enter for %s: " % (name,))
-        if line.upper() == "EXIT":
-            exit()
-        return bool(re.fullmatch(pattern, line))
-
-    targetTestObject = "genscript comment"
-    while True:
-        testresult = interactive_test(
-            genscriptCommentPattern, targetTestObject)
-        if testresult:
-            print("Good %s." % (targetTestObject,))
-        else:
-            print("Bad %s." % (targetTestObject,))
+    pass

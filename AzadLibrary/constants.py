@@ -7,8 +7,10 @@ This module should not import any other part of Azad library.
 from enum import Enum
 from decimal import Decimal
 from fractions import Fraction
+import os
 from sys import float_info
 import typing
+from pathlib import Path
 
 
 # Azad Library Version
@@ -17,7 +19,7 @@ AzadLibraryVersion = "0.3.3"
 
 # Config defaults
 SupportedConfigVersion = 1.0
-DefaultFloatPrecision = 1e-3
+DefaultFloatPrecision = 1e-6
 DefaultIOPath = "IO"
 DefaultInputSyntax = "%02d.in.txt"
 DefaultOutputSyntax = "%02d.out.txt"
@@ -26,7 +28,7 @@ DefaultMemoryLimit = 1024  # megabytes
 MaxParameterDimensionAllowed = 2
 
 # Log related
-DefaultLoggingFilePath = "azadlib.log"
+DefaultLoggingFileName = "azadlib.log"
 DefaultLogFileMaxSize = 10 * (2 ** 20)  # 10MB
 DefaultLogFileBackups = 5  # blabla.log.%d
 DefaultLogBaseFMT = "[%%(asctime)s][%%(levelname)-7s][%%(name)s][L%%(lineno)s] %%(message).%ds"
@@ -42,6 +44,9 @@ DefaultTypeStrings = {
     str: "str"
 }
 
+# Path to the resources folder
+ResourcesPath = Path(os.path.abspath(__file__)).parent / "resources"
+
 
 def __IODataTypesInfo_StringConstraints(x: str):
     """
@@ -52,7 +57,7 @@ def __IODataTypesInfo_StringConstraints(x: str):
     except UnicodeEncodeError:
         return False
     else:
-        return True
+        return '"' not in x
 
 
 def __IODataTypesInfo_FloatStrize(x: typing.Union[float, Decimal, Fraction]):
@@ -133,18 +138,18 @@ IODataTypesInfo = {
         "strize": (lambda x: "true" if x else "false"),
     }
 }
-for _typestr in IODataTypesInfo:
-    _dtinfo = IODataTypesInfo[_typestr]
+for _iovt in IODataTypesInfo:
+    _dtinfo = IODataTypesInfo[_iovt]
     assert isinstance(_dtinfo, dict)
     assert set(_dtinfo.keys()) == {"pytypes", "constraint", "strize"}
     assert isinstance(_dtinfo["pytypes"], (list, tuple))
+    for _t in _dtinfo["pytypes"]:
+        assert isinstance(_t, type)
     assert callable(_dtinfo["constraint"])
     assert callable(_dtinfo["strize"])
-    for _t in _dtinfo["constraint"]:
-        assert isinstance(_t, type)
 
 
-class SolutionCategory(Enum):
+class Verdict(Enum):
     """
     Enumeration of possible solution file status.
     """
@@ -155,7 +160,17 @@ class SolutionCategory(Enum):
     FAIL = "FAIL"
 
 
-# Category of source file languages
+def getSolutionCategory(categoryStr: str) -> Verdict:
+    """
+    Get solution category corresponding to given string.
+    """
+    categoryStrUpper = categoryStr.upper()
+    for category in Verdict:
+        if category.value == categoryStrUpper:
+            return category
+    raise ValueError("Invalid category '%s'" % (categoryStr,))
+
+
 class SourceFileLanguage(Enum):
     """
     Enumeration of possible solution file languages.
@@ -165,6 +180,13 @@ class SourceFileLanguage(Enum):
     Python3 = "py"
     Java = "java"
     Csharp = "cs"
+
+
+def getSourceFileLanguage(extension: str) -> SourceFileLanguage:
+    for lang in SourceFileLanguage:
+        if lang.value == extension:
+            return lang
+    raise ValueError("Couldn't found language for '.%s'" % (extension,))
 
 
 # Default Config state
@@ -180,7 +202,7 @@ StartingConfigState = {
         "time": DefaultTimeLimit,
         "memory": DefaultMemoryLimit
     },
-    "solutions": {category.value: [] for category in SolutionCategory},
+    "solutions": {category.value: [] for category in Verdict},
     "generators": {
         "sample": "put/your/path.py"
     },
@@ -247,10 +269,21 @@ class LogLevel(Enum):
     Debug = "Debug"
 
 
+class ExitCode(Enum):
     """
+    Enumeration of exit codes.
+    """
+    Success = 0  # Success
+    GeneralUnintendedFail = 1  # Catchall for general errors
+    InputParsingError = 3  # Failed to parse input
+    MLE = 4  # Memory Limit Exceeded
+    WrongTypeGenerated = 5  # Result variable type is wrong
+    ValidatorFailed = 6  # Validation function failed
+    SolutionFailed = 7  # Solution function failed (Verdict FAIL)
+    GeneratorFailed = 8  # Generator function failed
+    TLE = 9  # Time Limit Exceeded
 
 
-# Sourcefile Types
 class SourceFileType(Enum):
     """
     Enumeration of source file types.
@@ -258,3 +291,23 @@ class SourceFileType(Enum):
     Generator = "generator"
     Validator = "validator"
     Solution = "solution"
+
+
+# Short name of type hints
+OptionalPath = typing.Union[Path, None]
+EXOO = typing.Tuple[ExitCode, OptionalPath,
+                    OptionalPath]  # (ExitCode, outfile, stderr)
+ArgType = typing.List[typing.Union[str, Path]]
+ParamInfoSingle = typing.Tuple[str, IOVariableTypes, int]
+ParamInfoList = typing.List[ParamInfoSingle]
+ReturnInfoType = typing.Tuple[IOVariableTypes, int]
+
+
+class AzadLibraryMode(Enum):
+    """
+    Enumeration of Azad library mode.
+    """
+    Full = "full"  # Full produce and validation
+    Produce = "produce"  # Produce AC data only
+    GenerateCode = "generate_code"  # Generate code for external module only
+    Help = "help"  # Print help only

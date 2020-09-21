@@ -7,20 +7,14 @@ import typing
 from pathlib import Path
 from subprocess import Popen, DEVNULL, TimeoutExpired
 from string import Template as StringTemplate
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Azad libraries
 from .. import constants as Const
 from ..filesystem import TempFileSystem
 from ..misc import isExistingFile
-
-# Short name of type hints
-OptionalPath = typing.Union[Path, None]
-EXOO = typing.Tuple[Const.ExitCode, OptionalPath,
-                    OptionalPath]  # (ExitCode, outfile, stderr)
-ArgType = typing.List[typing.Union[str, Path]]
-ParamInfoSingle = typing.Tuple[str, Const.IOVariableTypes, int]
-ParamInfoList = typing.List[ParamInfoSingle]
-ReturnInfoType = typing.Tuple[Const.IOVariableTypes, int]
 
 
 class AbstractProgrammingLanguage:
@@ -79,17 +73,23 @@ class AbstractExternalModule:
     """
 
     def __init__(self, originalModulePath: Path, fs: TempFileSystem,
-                 parameterInfo: ParamInfoList, returnInfo: ReturnInfoType):
+                 parameterInfo: Const.ParamInfoList,
+                 returnInfo: Const.ReturnInfoType,
+                 *args, name: str = "", **kwargs):
         self.originalModulePath = originalModulePath
         self.fs = fs
         self.parameterInfo = parameterInfo
         self.returnInfo = returnInfo
         self.prepared = False
-        self.modulePath: OptionalPath = None
+        self.modulePath: Const.OptionalPath = None
+        self.name = name
+
+        # Prepare pipeline
+        logger.debug("Preparing pipeline for module '%s'..", name)
         self.preparePipeline()
 
     @classmethod
-    def generateArgs(cls, *args, **kwargs) -> ArgType:
+    def generateArgs(cls, *args, **kwargs) -> Const.ArgType:
         """
         Generate arguments to invoke.
         """
@@ -106,7 +106,7 @@ class AbstractExternalModule:
 
     @staticmethod
     def invoke(
-            args: ArgType, stdin: Path = None, stderr: Path = None,
+            args: Const.ArgType, stdin: Path = None, stderr: Path = None,
             timelimit: float = Const.DefaultTimeLimit,
             cwd: Path = None) -> Const.ExitCode:
         """
@@ -160,7 +160,7 @@ class AbstractExternalModule:
         """
         raise NotImplementedError
 
-    def run(self, *args, **kwargs) -> EXOO:
+    def run(self, *args, **kwargs) -> Const.EXOO:
         """
         The most abstract method of `run`.
         This method should return `(ExitCode, outfile, stderr)`.
@@ -183,18 +183,19 @@ class AbstractExternalGenerator(AbstractExternalModule):
     @classmethod
     def generateArgs(
             cls, outfile: typing.Union[str, Path], genscript: typing.List[str],
-            modulePath: typing.Union[str, Path], *args, **kwargs) -> ArgType:
+            modulePath: typing.Union[str, Path], *args, **kwargs) -> Const.ArgType:
         return [Path(modulePath), Path(outfile)] + genscript
 
     @classmethod
-    def generateCode(cls, generatorPath: Path, parameterInfo: ParamInfoList,
+    def generateCode(cls, generatorPath: Path,
+                     parameterInfo: Const.ParamInfoList,
                      *args, **kwargs) -> str:
         """
         Generate the generator code.
         """
         raise NotImplementedError
 
-    def run(self, genscript: typing.List[str], *args, **kwargs) -> EXOO:
+    def run(self, genscript: typing.List[str], *args, **kwargs) -> Const.EXOO:
         """
         Run generator with given genscript.
         Return exit code of generator subprocess and file path
@@ -205,8 +206,7 @@ class AbstractExternalGenerator(AbstractExternalModule):
         outfilePath = self.fs.newTempFile(extension="out")
         args = self.generateArgs(outfilePath, genscript, self.modulePath)
         errorLog = self.fs.newTempFile(extension="log")
-        exitcode = self.invoke(
-            args, stderr=errorLog, timelimit=10.0, cwd=self.fs.basePath)
+        exitcode = self.invoke(args, stderr=errorLog, cwd=self.fs.basePath)
         return (exitcode, outfilePath, errorLog)
 
 
@@ -221,19 +221,19 @@ class AbstractExternalValidator(AbstractExternalModule):
 
     @classmethod
     def generateArgs(cls, modulePath: typing.Union[str, Path],
-                     *args, **kwargs) -> ArgType:
+                     *args, **kwargs) -> Const.ArgType:
         return [Path(modulePath)]
 
     @classmethod
     def generateCode(
-            cls, validatorPath: Path, parameterInfo: ParamInfoList,
-            returnInfo: ReturnInfoType, *args, **kwargs) -> str:
+            cls, validatorPath: Path, parameterInfo: Const.ParamInfoList,
+            returnInfo: Const.ReturnInfoType, *args, **kwargs) -> str:
         """
         Generate the validator code.
         """
         raise NotImplementedError
 
-    def run(self, infile: Path, *args, **kwargs) -> EXOO:
+    def run(self, infile: Path, *args, **kwargs) -> Const.EXOO:
         """
         Run validator with given infile path.
         Return exit code of validator subprocess.
@@ -243,7 +243,7 @@ class AbstractExternalValidator(AbstractExternalModule):
         args = self.generateArgs(self.modulePath)
         errorLog = self.fs.newTempFile(extension="log")
         exitcode = self.invoke(args, stdin=infile, stderr=errorLog,
-                               timelimit=10.0, cwd=self.fs.basePath)
+                               cwd=self.fs.basePath)
         return (exitcode, None, errorLog)
 
 
@@ -257,18 +257,21 @@ class AbstractExternalSolution(AbstractExternalModule):
     @classmethod
     def generateArgs(
             cls, outfile: Path, modulePath: typing.Union[str, Path],
-            *args, **kwargs) -> ArgType:
+            *args, **kwargs) -> Const.ArgType:
         return [Path(modulePath), Path(outfile)]
 
     @classmethod
-    def generateCode(cls, solutionPath: Path, parameterInfo: ParamInfoList,
-                     returnInfo: ReturnInfoType, *args, **kwargs) -> str:
+    def generateCode(
+            cls, solutionPath: Path, parameterInfo: Const.ParamInfoList,
+            returnInfo: Const.ReturnInfoType, *args, **kwargs) -> str:
         """
         Generate the solution code.
         """
         raise NotImplementedError
 
-    def run(self, infile: Path, *args, **kwargs) -> EXOO:
+    def run(self, infile: Path, *args,
+            timelimit: float = Const.DefaultTimeLimit,
+            **kwargs) -> Const.EXOO:
         """
         Run solution with given inflie path.
         Return exit code of solution process and file path
@@ -279,6 +282,7 @@ class AbstractExternalSolution(AbstractExternalModule):
         outfilePath = self.fs.newTempFile(extension="out")
         args = self.generateArgs(outfilePath, self.modulePath)
         errorLog = self.fs.newTempFile(extension="log")
-        exitcode = self.invoke(args, stdin=infile, stderr=errorLog,
-                               timelimit=10.0, cwd=self.fs.basePath)
+        exitcode = self.invoke(
+            args, stdin=infile, stderr=errorLog,
+            timelimit=timelimit, cwd=self.fs.basePath)
         return (exitcode, outfilePath, errorLog)

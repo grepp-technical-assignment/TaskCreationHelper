@@ -11,8 +11,7 @@ from .. import constants as Const
 from ..misc import isExistingFile, removeExtension
 from .abstract import (
     AbstractProgrammingLanguage, AbstractExternalGenerator,
-    AbstractExternalValidator, AbstractExternalSolution,
-    ArgType, ParamInfoList, ReturnInfoType)
+    AbstractExternalValidator, AbstractExternalSolution)
 
 
 class AbstractPython3(AbstractProgrammingLanguage):
@@ -117,13 +116,13 @@ class Python3Generator(AbstractExternalGenerator, AbstractPython3):
     def generateArgs(cls, outfile: typing.Union[str, Path],
                      genscript: typing.List[str],
                      modulePath: typing.Union[str, Path],
-                     *args, **kwargs) -> ArgType:
+                     *args, **kwargs) -> Const.ArgType:
         return ["python3", *super().generateArgs(
             outfile, genscript, modulePath, *args, **kwargs)]
 
     @classmethod
     def generateCode(
-            cls, generatorPath: Path, parameterInfo: ParamInfoList,
+            cls, generatorPath: Path, parameterInfo: Const.ParamInfoList,
             ioHelperPath: Path, *args, **kwargs) -> str:
         return cls.replaceSymbols(
             cls.generatorTemplatePath, cls.templateDict(
@@ -136,7 +135,8 @@ class Python3Generator(AbstractExternalGenerator, AbstractPython3):
         code = self.generateCode(
             self.originalModulePath, self.parameterInfo,
             self.ioHelperTemplatePath)
-        self.modulePath = self.fs.newTempFile(code, extension='py')
+        self.modulePath = self.fs.newTempFile(
+            code, extension=Const.SourceFileLanguage.Python3.value)
         self.prepared = True
 
 
@@ -149,14 +149,14 @@ class Python3Validator(AbstractExternalValidator, AbstractPython3):
 
     @classmethod
     def generateArgs(cls, modulePath: typing.Union[str, Path],
-                     *args, **kwargs) -> ArgType:
+                     *args, **kwargs) -> Const.ArgType:
         return ["python3",
                 *super().generateArgs(modulePath, *args, **kwargs)]
 
     @classmethod
     def generateCode(
-            cls, validatorPath: Path, parameterInfo: ParamInfoList,
-            returnInfo: ReturnInfoType, ioHelperPath: Path,
+            cls, validatorPath: Path, parameterInfo: Const.ParamInfoList,
+            returnInfo: Const.ReturnInfoType, ioHelperPath: Path,
             *args, **kwargs) -> str:
         return cls.replaceSymbols(
             cls.validatorTemplatePath,
@@ -170,7 +170,8 @@ class Python3Validator(AbstractExternalValidator, AbstractPython3):
         code = self.generateCode(
             self.originalModulePath, self.parameterInfo,
             self.returnInfo, self.ioHelperTemplatePath)
-        self.modulePath = self.fs.newTempFile(code, extension='py')
+        self.modulePath = self.fs.newTempFile(
+            code, extension=Const.SourceFileLanguage.Python3.value)
         self.prepared = True
 
 
@@ -184,15 +185,15 @@ class Python3Solution(AbstractExternalSolution, AbstractPython3):
     @classmethod
     def generateArgs(
             cls, outfile: Path, modulePath: typing.Union[str, Path],
-            *args, **kwargs) -> ArgType:
+            *args, **kwargs) -> Const.ArgType:
         return ["python3",
                 *super().generateArgs(outfile, modulePath, *args, **kwargs)]
 
     @classmethod
     def generateCode(
             cls, solutionPath: Path,
-            parameterInfo: ParamInfoList,
-            returnInfo: ReturnInfoType,
+            parameterInfo: Const.ParamInfoList,
+            returnInfo: Const.ReturnInfoType,
             ioHelperPath: Path, *args, **kwargs) -> str:
         return cls.replaceSymbols(
             cls.solutionTemplatePath,
@@ -206,5 +207,6 @@ class Python3Solution(AbstractExternalSolution, AbstractPython3):
         code = self.generateCode(
             self.originalModulePath, self.parameterInfo,
             self.returnInfo, self.ioHelperTemplatePath)
-        self.modulePath = self.fs.newTempFile(code, extension='py')
+        self.modulePath = self.fs.newTempFile(
+            code, extension=Const.SourceFileLanguage.Python3.value)
         self.prepared = True

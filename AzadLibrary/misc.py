@@ -14,6 +14,7 @@ from pathlib import Path
 
 # Azad libraries
 from . import constants as Const
+from .syntax import extensionSyntax
 
 
 def barLine(message: str, lineLength: int = 120) -> str:
@@ -56,8 +57,8 @@ def randomName(length: int):
 
 
 def validateVerdict(
-        verdictCount: dict,
-        intendedCategories: typing.List[Const.SolutionCategory]) -> bool:
+        verdictCount: typing.Mapping[Const.Verdict, int],
+        *intendedCategories: typing.Tuple[Const.Verdict, ...]) -> bool:
     """
     Validate verdict with intended categories.
     """
@@ -69,14 +70,14 @@ def validateVerdict(
     # Check
     foundFeasibleCategories = set()  # This should not be empty
     for category in verdictCount:
-        if not isinstance(category, Const.SolutionCategory):
+        if not isinstance(category, Const.Verdict):
             raise TypeError(
                 "Invalid category type %s in verdictCount found" %
                 (type(category),))
         elif verdictCount[category] == 0:
             continue
         elif category not in intendedCategories:  # Tolerate AC only
-            if category is Const.SolutionCategory.AC:
+            if category is Const.Verdict.AC:
                 continue
             else:
                 return False
@@ -151,6 +152,74 @@ def getAvailableCPUCount() -> typing.Union[int, None]:
         return len(os.sched_getaffinity(0))
     except AttributeError:
         return os.cpu_count()
+
+
+def isExistingFile(path: Path) -> bool:
+    """
+    Check if given path is existing file.
+    """
+    if isinstance(path, str):
+        path = Path(path)
+    return isinstance(path, Path) and path.exists() and path.is_file()
+
+
+def zipUnzipByOrders(*iterators):
+    """
+    Combine all iterators into single iterators.
+    >>> list(zipUnzipByOrders([1,2],[3,4,5,6],[7,8,9]))
+    [1,3,7,2,4,8,5,9,6]
+    """
+    iterators = [iter(it) for it in iterators]
+    while iterators:
+        dead = set()
+        for i in range(len(iterators)):
+            try:
+                yield next(iterators[i])
+            except StopIteration:
+                dead.add(i)
+        if dead:
+            iterators = [iterators[i] for i in range(len(iterators))
+                         if i not in dead]
+
+
+def getExtension(path: typing.Union[str, Path]) -> typing.Union[str, None]:
+    """
+    Return given path's file extension if exists.
+    """
+    if isinstance(path, str):
+        path = Path(path)
+    filenameSplitted = path.name.split(".")
+    if len(filenameSplitted) > 1 and \
+            extensionSyntax.fullmatch(filenameSplitted[-1]):
+        return filenameSplitted[-1]
+    else:
+        return None
+
+
+def removeExtension(path: typing.Union[str, Path]) -> str:
+    """
+    Return given path's filename without extension.
+    """
+    if isinstance(path, str):
+        path = Path(path)
+    extension = getExtension(path)
+    if extension is None:
+        return path.name
+    else:
+        return path.name[:-(len(extension) + 1)]
+
+
+def checkPrecision(a: float, b: float,
+                   precision: float = Const.DefaultFloatPrecision):
+    """
+    Check similarity between two float numbers with given precision.
+    """
+    if precision <= 0:
+        raise ValueError("Non-positive precision %f given" % (precision,))
+    elif abs(a) <= precision ** 2:
+        return abs(a - b) <= precision
+    else:
+        return abs(a - b) <= precision or abs((a - b) / a) <= precision
 
 
 if __name__ == "__main__":

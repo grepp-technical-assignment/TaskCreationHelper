@@ -12,7 +12,7 @@ import threading
 import logging
 
 # Azad libraries
-from .misc import (randomName, isExistingFile)
+from .misc import randomName
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +25,7 @@ class TempFileSystem:
     def __init__(self, basePath: typing.Union[str, Path]):
 
         # BasePath should exists
-        if not isExistingFile(basePath):
+        if not basePath.exists() or basePath.is_file():
             raise NotADirectoryError("Invalid path '%s'" % (basePath,))
 
         # Make new temporary folder
@@ -46,15 +46,18 @@ class TempFileSystem:
         logger.info("Temporary filesystem based on '%s' is created.",
                     self.basePath)
 
-    def __findFeasiblePath(self, extension: str = "temp",
-                           randomNameLength: int = 60) -> str:
+    def __findFeasiblePath(
+            self, extension: str = "temp", randomNameLength: int = None,
+            namePrefix: str = None) -> str:
         """
         Find any feasible file name to create new one.
         This method is not threadsafe.
         """
-        iteration = 0
-        while iteration >= 1000:
-            tempFileName = "tmp_" + randomName(randomNameLength) + \
+        namePrefix = "" if not namePrefix else namePrefix + "_"
+        randomNameLength = 30 if not randomNameLength else randomNameLength
+        iteration, iterLimit = 0, 10 ** 3
+        while iteration < iterLimit:
+            tempFileName = namePrefix + randomName(randomNameLength) + \
                 ("." + extension if extension else "")
             tempFilePath = self.basePath / tempFileName
             if tempFilePath not in self.tempFiles:
@@ -65,7 +68,8 @@ class TempFileSystem:
 
     def newTempFile(self, content: typing.Union[str, bytes] = None,
                     filename: str = None, extension: str = "temp",
-                    randomNameLength: int = 60, isBytes: bool = False) -> Path:
+                    randomNameLength: int = None, isBytes: bool = False,
+                    namePrefix: str = None) -> Path:
         """
         Create file and return path.
         - If `content` is not given, then empty file will be created.
@@ -97,7 +101,8 @@ class TempFileSystem:
                         "Filename '%s' already exists" % (tempFilePath.name,))
             else:
                 tempFilePath = self.__findFeasiblePath(
-                    extension=extension, randomNameLength=randomNameLength)
+                    extension=extension, randomNameLength=randomNameLength,
+                    namePrefix=namePrefix)
             self.tempFiles.add(tempFilePath)
             with open(tempFilePath, "wb" if isBytes else "w") as tempFile:
                 if content is not None:
@@ -106,7 +111,7 @@ class TempFileSystem:
 
     def copy(self, origin: typing.Union[str, Path],
              destination: str = None, extension: str = "temp",
-             randomNameLength: int = 60) -> Path:
+             randomNameLength: int = None, namePrefix: str = None) -> Path:
         """
         Copy the external file into current temp file system.
         """
@@ -120,7 +125,8 @@ class TempFileSystem:
                         "Filename '%s' already exists" % (tempFilePath.name,))
             else:
                 tempFilePath = self.__findFeasiblePath(
-                    extension=extension, randomNameLength=randomNameLength)
+                    extension=extension, randomNameLength=randomNameLength,
+                    namePrefix=namePrefix)
             shutil.copyfile(origin, tempFilePath)
         return tempFilePath
 
@@ -136,6 +142,8 @@ class TempFileSystem:
             raise IOError("File system closed")
 
         # Erase the file
+        if isinstance(filePath, str):
+            filePath = Path(filePath)
         with self.semaphore:
             if filePath not in self.tempFiles:
                 raise FileNotFoundError(

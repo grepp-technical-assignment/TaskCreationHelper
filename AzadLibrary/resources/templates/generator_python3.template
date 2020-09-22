@@ -43,7 +43,7 @@ def main(*argv):
     try:
         if generated:
             raise ValueError("Generator generated extra parameters: [%s]" 
-                % ("".join(generated.keys()),))
+                % (", ".join(generated.keys()),))
     except ValueError as err:
         TCHIO.printException(err)
         exit($ExitCodeGeneratorFailed)
@@ -53,4 +53,4 @@ def main(*argv):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    main(*sys.argv[1:])

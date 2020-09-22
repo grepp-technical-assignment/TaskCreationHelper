@@ -34,11 +34,10 @@ def main(*argv):
         exit($ExitCodeSolutionFailed)
 
     # Print out
-    resultType, resultDimension = ($resultInfo)
     try:
         with open(Path(argv[0]), "w") as outfile:
-            TCHIO.printData(result, resultType, 
-                resultDimension, file = outfile)
+            TCHIO.printData(result, $ReturnType, 
+                $ReturnDimension, file = outfile)
     except (TypeError, AssertionError, ValueError) as err:
         TCHIO.printException(err)
         exit($ExitCodeWrongTypeGenerated)
@@ -48,4 +47,4 @@ def main(*argv):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    main(*sys.argv[1:])

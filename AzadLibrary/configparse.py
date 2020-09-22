@@ -36,18 +36,16 @@ class TaskConfiguration:
             validator: Path = None,
             **kwargs):
 
-        # Let's start
-        logger.info("Constructing configuration from given file...")
-        self.directory = cwd
-        logger.info("Basic path is '%s'", cwd)
-
         # Log file
+        self.directory = cwd
         self.logFilePath = self.directory / \
             (log if log else Const.DefaultLoggingFileName)
         with open(self.logFilePath, "a") as mainLogFile:
             mainLogFile.write("\n" + "=" * 240 + "\n\n")
         setupLoggers(self.logFilePath, resetRootLoggerConfig,
                      mainProcess=True, noStreamHandler=False)
+        logger.info("Constructing configuration from given file...")
+        logger.info("Basic path is '%s'", cwd)
 
         # Version
         logger.debug("Validating config version..")
@@ -93,10 +91,9 @@ class TaskConfiguration:
         # Floating point precision
         self.floatPrecision = float(precision)
 
-        # Parameters
+        # Parameters: [(name, iovt, dimension), ..]
         logger.debug("Validating parameters..")
-        self.parameters = {}  # {name: {order, iovt, dimension}}
-        _i = 0
+        self.parameters: typing.List[str, Const.IOVariableTypes, int] = []
         for obj in parameters:
             if not isinstance(obj, dict):
                 raise TypeError
@@ -104,19 +101,14 @@ class TaskConfiguration:
                 raise ValueError("Invalid keys")
             varName, varType, dimension = obj["name"], \
                 Const.getIOVariableType(obj["type"]), int(obj["dimension"])
-            if varName in self.parameters:
+            if varName in [p[0] for p in self.parameters]:
                 raise ValueError(
                     "Parameter name %s occurred multiple times" %
                     (varName,))
             elif not (0 <= dimension <= Const.MaxParameterDimensionAllowed):
                 raise ValueError("Invalid dimension %d in parameter %s" %
                                  (dimension, varName))
-            self.parameters[varName] = {
-                "order": _i, "type": varType, "dimension": dimension}
-            _i += 1
-        self.parameterNamesSorted = sorted(
-            (name for name in self.parameters),
-            key=lambda x: self.parameters[x]["order"])
+            self.parameters.append((varName, varType, dimension))
 
         # Return value
         logger.debug("Validating return info..")
@@ -154,7 +146,9 @@ class TaskConfiguration:
 
         # Solution files
         logger.debug("Validating solution files..")
-        self.solutions = {}
+        self.solutions: typing.Mapping[
+            typing.Tuple[Const.Verdict, ...],
+            typing.List[Path]] = {}
         if not isinstance(solutions, dict):
             raise TypeError("Solutions should be provided")
         for key in solutions:
@@ -169,12 +163,16 @@ class TaskConfiguration:
                     raise FileNotFoundError(
                         "Solution '%s' (%s) doesn't exists" %
                         (path, ",".join(c.name for c in thisCategories)))
-        if (Const.SolutionCategory.AC,) not in self.solutions:
+                else:
+                    self.solutions[thisCategories].append(path)
+        if (Const.Verdict.AC,) not in self.solutions or \
+                not self.solutions[(Const.Verdict.AC, )]:
             raise AzadError("There is no main AC solution")
 
         # Generators
         logger.debug("Validating generator files..")
-        self.generators = generators if isinstance(generators, dict) else {}
+        self.generators: typing.Mapping[str, Path] = \
+            generators if isinstance(generators, dict) else {}
         if not self.generators:
             raise ValueError("There is no generator registered")
         for generatorName in tuple(self.generators.keys()):
@@ -192,10 +190,11 @@ class TaskConfiguration:
         logger.debug("Validating genscript..")
         if not isinstance(genscript, (list, tuple)):
             raise TypeError
-        self.genscript = [Syntax.cleanGenscript(line, self.generators.keys())
-                          for line in genscript]
-        self.genscript = [x for x in self.genscript if x]
-        if not self.genscript:
+        self.genscripts = [Syntax.cleanGenscript(line, self.generators.keys())
+                           for line in genscript]
+        self.genscripts: typing.List[typing.List[str]] = \
+            [x for x in self.genscripts if x]
+        if not self.genscripts:
             raise ValueError("There is no non-commented genscript.")
 
         # Validator

@@ -12,6 +12,7 @@ import sys
 import time
 import typing
 from pathlib import Path
+import threading
 
 # Azad libraries
 from . import constants as Const
@@ -208,6 +209,24 @@ def removeExtension(path: typing.Union[str, Path]) -> str:
         return path.name
     else:
         return path.name[:-(len(extension) + 1)]
+
+
+def runThreads(func: typing.Callable[..., typing.Any],
+               *argss: typing.Tuple[tuple, ...],
+               timeout: float = None) -> float:
+    """
+    Run multiple threads on same function but different arguments.
+    Return total time used to execute all threads.
+    """
+    threads = [threading.Thread(
+        target=func, args=args, kwargs=kwargs) for (args, kwargs) in argss]
+    startTime = time.perf_counter()
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=timeout)
+    endTime = time.perf_counter()
+    return endTime - startTime
 
 
 if __name__ == "__main__":

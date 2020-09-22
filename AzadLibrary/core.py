@@ -22,7 +22,9 @@ from . import (
     externalmodule as ExternalModule,
     iodata as IOData,
 )
-from .misc import (validateVerdict, getAvailableCPUCount, getExtension)
+from .misc import (
+    validateVerdict, getAvailableCPUCount,
+    getExtension, runThreads)
 from .filesystem import TempFileSystem
 from .configparse import TaskConfiguration
 
@@ -195,16 +197,9 @@ class AzadCore:
                              index + 1, endTime - startTime)
 
         # Do multiprocessing
-        threads = [threading.Thread(target=run, args=(i,))
-                   for i in range(len(self.config.genscripts))]
-        startTime = time.perf_counter()
-        for thread in threads:
-            thread.start()
-        for thread in threads:
-            thread.join()
-        endTime = time.perf_counter()
-        logger.info("Finished all generator process in %g seconds.",
-                    endTime - startTime)
+        timeDiff = runThreads(
+            run, *[((i,), {}) for i in range(len(self.config.genscripts))])
+        logger.info("Finished all generator process in %g seconds.", timeDiff)
 
         # Check if there is any failure
         failedIndices = []
@@ -267,16 +262,9 @@ class AzadCore:
                              index + 1, endTime - startTime)
 
         # Do multithreading
-        threads = [threading.Thread(target=run, args=(i,))
-                   for i in range(len(inputFiles))]
-        startTime = time.perf_counter()
-        for thread in threads:
-            thread.start()
-        for thread in threads:
-            thread.join()
-        endTime = time.perf_counter()
-        logger.info("Finished all validation process in %g seconds",
-                    endTime - startTime)
+        timeDiff = runThreads(
+            run, *[((i,), {}) for i in range(len(inputFiles))])
+        logger.info("Finished all validation process in %g seconds", timeDiff)
 
         # Check if there is any failure
         failedIndices = []
@@ -335,16 +323,10 @@ class AzadCore:
                              solutionName, index + 1, endTime - startTime)
 
         # Do multithreading
-        threads = [threading.Thread(target=run, args=(i,))
-                   for i in range(len(inputFiles))]
-        startTime = time.perf_counter()
-        for thread in threads:
-            thread.start()
-        for thread in threads:
-            thread.join()
-        endTime = time.perf_counter()
+        timeDiff = runThreads(
+            run, *[((i,), {}) for i in range(len(inputFiles))])
         logger.info("Finished all solution '%s' process in %g seconds.",
-                    solutionName, endTime - startTime)
+                    solutionName, timeDiff)
 
         # Determine verdicts
         logger.debug("Analyzing verdicts of solution '%s' (intended %s)..",

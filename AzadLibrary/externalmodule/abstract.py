@@ -206,7 +206,7 @@ class AbstractExternalGenerator(AbstractExternalModule):
         outfilePath = self.fs.newTempFile(extension="data", namePrefix="in")
         args = self.generateArgs(outfilePath, genscript, self.modulePath)
         errorLog = self.fs.newTempFile(extension="log", namePrefix="err")
-        exitcode = self.invoke(args, stderr=errorLog, cwd=self.fs.basePath)
+        exitcode = self.invoke(args, stderr=errorLog)
         return (exitcode, outfilePath, errorLog)
 
 
@@ -242,8 +242,7 @@ class AbstractExternalValidator(AbstractExternalModule):
             raise OSError("Generator not prepared")
         args = self.generateArgs(self.modulePath)
         errorLog = self.fs.newTempFile(extension="log", namePrefix="err")
-        exitcode = self.invoke(args, stdin=infile, stderr=errorLog,
-                               cwd=self.fs.basePath)
+        exitcode = self.invoke(args, stdin=infile, stderr=errorLog)
         return (exitcode, None, errorLog)
 
 
@@ -283,6 +282,5 @@ class AbstractExternalSolution(AbstractExternalModule):
         args = self.generateArgs(outfilePath, self.modulePath)
         errorLog = self.fs.newTempFile(extension="log", namePrefix="err")
         exitcode = self.invoke(
-            args, stdin=infile, stderr=errorLog,
-            timelimit=timelimit, cwd=self.fs.basePath)
+            args, stdin=infile, stderr=errorLog, timelimit=timelimit)
         return (exitcode, outfilePath, errorLog)

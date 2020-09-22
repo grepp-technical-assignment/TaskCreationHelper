@@ -35,15 +35,6 @@ class AzadCore:
     def __init__(self, configFilename: typing.Union[str, Path],
                  resetRootLoggerConfig: bool = True):
 
-        logger.info("Azad Library Version is %s", Const.AzadLibraryVersion)
-        logger.info("Current directory is %s", os.getcwd())
-
-        # Upper bound of number of threads
-        CPUcount = getAvailableCPUCount()
-        self.threadUpperBound: int = CPUcount if CPUcount is not None else 1
-        logger.info("Total %s processor cores are available.",
-                    CPUcount if CPUcount else "unknown")
-
         # Get configuration JSON
         if not isinstance(configFilename, (str, Path)):
             raise TypeError
@@ -56,6 +47,25 @@ class AzadCore:
             resetRootLoggerConfig=resetRootLoggerConfig,
             **parsedConfig)
 
+        # Let's go
+        logger.info("Azad Library Version is %s", Const.AzadLibraryVersion)
+        logger.info("Current directory is %s", os.getcwd())
+
+        # Upper bound of number of threads
+        CPUcount = getAvailableCPUCount()
+        self.threadUpperBound: int = CPUcount if CPUcount is not None else 1
+        logger.info("Total %s processor cores are available.",
+                    CPUcount if CPUcount else "unknown")
+
+        # Replace precision equality function
+        _iovt_precision_eq = (
+            lambda x, y: Const.checkPrecision(
+                x, y, precision=self.config.floatPrecision))
+        Const.IODataTypesInfo[Const.IOVariableTypes.FLOAT]["equal"] = \
+            _iovt_precision_eq
+        Const.IODataTypesInfo[Const.IOVariableTypes.DOUBLE]["equal"] = \
+            _iovt_precision_eq
+
         # Module attributes
         self.generatorModules: typing.Mapping[
             str, ExternalModule.AbstractExternalGenerator] = {}  # {name: module}
@@ -65,6 +75,9 @@ class AzadCore:
             typing.Tuple[Const.IOVariableTypes, ...],
             typing.List[ExternalModule.AbstractExternalSolution]
         ] = {}  # {(category, ...): [module, ...]}
+        self.helperModules: typing.Mapping[  # {lang: {name: path, ...}}
+            Const.SourceFileLanguage, typing.Mapping[str, Path]
+        ] = {lang: {} for lang in Const.SourceFileLanguage}
 
         # Inner attributes and flags
         self.producedAnswers = []
@@ -90,38 +103,66 @@ class AzadCore:
         """
         logger.info("Preparing modules..")
 
+        # Copy helper modules
+        self.helperModules[Const.SourceFileLanguage.Python3]["io"] = \
+            self.fs.copy(ExternalModule.AbstractPython3.ioHelperTemplatePath,
+                         extension="py", namePrefix="helper")
+
+        # Language specification for kwargs in getModule function
+        _kwargs_lang_specification = {
+            Const.SourceFileLanguage.Python3: {
+                "ioHelperModulePath":
+                self.helperModules[Const.SourceFileLanguage.Python3]["io"]
+            }
+        }
+
         def getModule(
-                modulePath: Path, filetype: Const.SourceFileType,
-                name: str) -> ExternalModule.AbstractExternalModule:
+            sourceCodePath: Path, filetype: Const.SourceFileType,
+            name: str, namePrefix: str = None) -> \
+                ExternalModule.AbstractExternalModule:
             """
             Helper function for getting module.
             """
-            extension = getExtension(modulePath)
+            # Basics
+            extension = getExtension(sourceCodePath)
             lang = Const.getSourceFileLanguage(extension)
-            return ExternalModule.getExternalModuleClass(lang, filetype)(
-                modulePath, self.fs, self.config.parameters,
-                (self.config.returnType, self.config.returnDimension),
-                name=name)
+            modulePath = self.fs.copy(sourceCodePath, extension=extension,
+                                      namePrefix=namePrefix)
+
+            # Prepare type, args and kwargs
+            moduleType = ExternalModule.getExternalModuleClass(lang, filetype)
+            args = (modulePath, self.fs, self.config.parameters,
+                    (self.config.returnType, self.config.returnDimension))
+            kwargs = {"name": name}
+            if lang in _kwargs_lang_specification:
+                kwargs.update(_kwargs_lang_specification[lang])
+
+            # Return
+            return moduleType(*args, **kwargs)
 
         # Generator modules
         for generatorName in self.config.generators:
             self.generatorModules[generatorName] = getModule(
                 self.config.generators[generatorName],
                 Const.SourceFileType.Generator,
-                "Generator %s" % (generatorName,))
+                "Generator %s" % (generatorName,),
+                namePrefix="origin_generator")
 
         # Validator module
         if self.config.validator:
             self.validatorModule = getModule(
                 self.config.validator,
-                Const.SourceFileType.Validator, "Validator")
+                Const.SourceFileType.Validator, "Validator",
+                namePrefix="origin_validator")
 
         # Solution modules
         for categories in self.config.solutions:
+            self.solutionModules[categories] = []
             for path in self.config.solutions[categories]:
-                self.solutionModules = getModule(
+                self.solutionModules[categories].append(getModule(
                     path, Const.SourceFileType.Solution,
-                    "Solution '%s'" % (path.name,))
+                    "Solution '%s'" % (path.name,),
+                    namePrefix="origin_solution"))
 
     def generateInput(self) -> typing.List[Path]:
         """
@@ -144,8 +185,8 @@ class AzadCore:
             """
             with semaphore:
                 logger.debug("Starting generation #%d..", index + 1)
-                genscript = self.config.genscripts[index]
-                generatorName = genscript[0]
+                generatorName = self.config.genscripts[index][0]
+                genscript = self.config.genscripts[index][1:]
                 module = self.generatorModules[generatorName]
                 startTime = time.perf_counter()
                 results[index] = module.run(genscript)
@@ -173,7 +214,7 @@ class AzadCore:
                 failedIndices.append(i)
                 with open(errLog, "r") as errorLogFile:
                     logger.error(
-                        "Generation #%d failed(%s, genscript = '%s'); Error log:\n%s",
+                        "Generation #%d failed(%s, genscript = \"%s\"); Error log:\n%s",
                         i + 1, exitcode.name, self.config.genscripts[i],
                         errorLogFile.read())
             else:  # Even if exit code is success, try parsing
@@ -183,7 +224,7 @@ class AzadCore:
                         for _0, iovt, dimension in self.config.parameters:
                             IOData.parseMulti(iterator, iovt, dimension)
                 except (StopIteration, TypeError, ValueError) as err:
-                    logger.error("Error raised while parsing input data #%d (genscript = '%s')",
+                    logger.error("Error raised while parsing input data #%d (genscript = \"%s\")",
                                  i + 1, self.config.genscripts[i])
                     raise err.with_traceback(err.__traceback__)
 
@@ -191,7 +232,7 @@ class AzadCore:
         if failedIndices:
             raise Errors.FailedDataGeneration(
                 "Generator process failed on %s; Please check log file" %
-                ("".join("#%d" % (i + 1,) for i in failedIndices),))
+                (", ".join("#%d" % (i + 1,) for i in failedIndices),))
         else:  # Successfully generated
             for _0, _1, errLog in results:
                 self.fs.pop(errLog)
@@ -207,6 +248,7 @@ class AzadCore:
             return
 
         # Prepare stuffs
+        logger.info("Validating input..")
         semaphore = threading.BoundedSemaphore(self.threadUpperBound)
         results: typing.List[Const.EXOO] = \
             [(None, None, None) for _ in inputFiles]
@@ -249,7 +291,7 @@ class AzadCore:
         if failedIndices:
             raise Errors.FailedDataValidation(
                 "Validation process failed on %s; Please check log file" %
-                ("".join("#%d" % (i + 1,) for i in failedIndices),))
+                (", ".join("#%d" % (i + 1,) for i in failedIndices),))
         else:
             for _0, _1, errLog in results:
                 self.fs.pop(errLog)
@@ -309,13 +351,23 @@ class AzadCore:
                      solutionName, ", ".join(c.name for c in intendedCategories))
         verdicts: typing.List[Const.Verdict] = []
         for i in range(len(inputFiles)):
-            exitcode, _1, _2 = result[i]
+            exitcode, outfilePath, _2 = result[i]
             verdict = Const.Verdict.FAIL
             if exitcode is Const.ExitCode.Success:
                 if not compare:
                     verdict = Const.Verdict.AC
                 else:
-                    raise NotImplementedError
+                    answer = answers[i]
+                    with open(outfilePath, "r") as outfile:
+                        iterator = IOData.yieldLines(outfile)
+                        produced = IOData.parseMulti(
+                            iterator, self.config.returnType,
+                            self.config.returnDimension)
+                    verdict = Const.Verdict.AC if IOData.isCorrectAnswer(
+                        answer, produced,
+                        self.config.returnType,
+                        self.config.returnDimension) \
+                        else Const.Verdict.WA
             elif exitcode is Const.ExitCode.TLE:
                 verdict = Const.Verdict.TLE
             elif exitcode is Const.ExitCode.MLE:
@@ -358,6 +410,8 @@ class AzadCore:
             raise ValueError("No input files given")
 
         # Run main AC first
+        logger.info("Generating outputs for %s..",
+                    "main AC only" if mainACOnly else "all solutions")
         AConly: typing.Tuple[Const.Verdict, ...] = (Const.Verdict.AC,)
         mainACModule: ExternalModule.AbstractExternalSolution = \
             self.solutionModules[AConly][0]
@@ -369,13 +423,14 @@ class AzadCore:
         answers = []
         for i in range(len(answerFiles)):
             answerFile = answerFiles[i]
-            iterator = IOData.yieldLines(answerFile)
             try:
-                answers.append(
-                    IOData.parseMulti(iterator, self.config.returnType,
-                                      self.config.returnDimension))
+                with open(answerFile, "r") as file:
+                    iterator = IOData.yieldLines(file)
+                    answers.append(IOData.parseMulti(
+                        iterator, self.config.returnType,
+                        self.config.returnDimension))
                 self.fs.pop(answerFile)
-            except ValueError as err:
+            except (ValueError, TypeError) as err:  # Produced wrong data
                 logger.error("Main solution produced wrong data on #%d", i + 1)
                 raise err.with_traceback(err.__traceback__)
         del answerFiles
@@ -383,7 +438,7 @@ class AzadCore:
         # Run all other solution files
         if not mainACOnly:
             for category in self.solutionModules:
-                for i in range(list(self.solutionModules[category])):
+                for i in range(len(self.solutionModules[category])):
                     module = self.solutionModules[category][i]
                     if module is mainACModule:
                         continue
@@ -429,7 +484,7 @@ class AzadCore:
                 outFile.write(IOData.PGizeData(
                     answers[i], self.config.returnType))
 
-    def totalPipeline(self, mode: Const.AzadLibraryMode):
+    def run(self, mode: Const.AzadLibraryMode):
         """
         Execute total pipeline with given mode.
         """
@@ -440,7 +495,7 @@ class AzadCore:
         self.prepareModules()
         if mode is Const.AzadLibraryMode.GenerateCode:
             while True:
-                line = input("When you are ready, enter 'Q' to quit:")
+                line = input("Enter 'Q' to quit:")
                 if line.strip().upper() == 'Q':
                     break
             return
@@ -449,7 +504,7 @@ class AzadCore:
         inputDataFiles = self.generateInput()
         self.validateInput(inputDataFiles)
         answers = self.generateOutputs(
-            inputDataFiles, mainACOnly=(mode is Const.AzadLibraryMode.Full))
+            inputDataFiles, mainACOnly=(mode is Const.AzadLibraryMode.Produce))
 
         # Write PGized I/O files
         IOData.cleanIOFilePath(self.config.IOPath)

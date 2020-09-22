@@ -60,7 +60,7 @@ def parseSingle(line: str, targetType: Const.IOVariableTypes) \
             raise ValueError
         return line == "true"
     else:
-        raise TypeError("Unknown type t(%s) for single parse" % (targetType,))
+        raise ValueError("Unknown type t(%s) for single parse" % (targetType,))
 
 
 def parseMulti(lines: typing.Iterator[str],
@@ -80,7 +80,7 @@ def parseMulti(lines: typing.Iterator[str],
             raise ValueError("Parsed data failed on constraint func")
         return result
     else:
-        size: int = parseSingle(next(lines), int)
+        size: int = parseSingle(next(lines), Const.IOVariableTypes.INT)
         result = [parseMulti(lines, targetType, dimension - 1)
                   for _ in range(size)]
         if dimension > 1 and len(set(len(element) for element in result)) > 1:

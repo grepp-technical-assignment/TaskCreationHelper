@@ -6,6 +6,7 @@ This module contains miscellaneous functions.
 import random
 import warnings
 import logging
+import logging.handlers
 import os
 import sys
 import time
@@ -207,19 +208,6 @@ def removeExtension(path: typing.Union[str, Path]) -> str:
         return path.name
     else:
         return path.name[:-(len(extension) + 1)]
-
-
-def checkPrecision(a: float, b: float,
-                   precision: float = Const.DefaultFloatPrecision):
-    """
-    Check similarity between two float numbers with given precision.
-    """
-    if precision <= 0:
-        raise ValueError("Non-positive precision %f given" % (precision,))
-    elif abs(a) <= precision ** 2:
-        return abs(a - b) <= precision
-    else:
-        return abs(a - b) <= precision or abs((a - b) / a) <= precision
 
 
 if __name__ == "__main__":

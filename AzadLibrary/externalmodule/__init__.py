@@ -7,7 +7,15 @@ This module provides top interface of external module features.
 # Azad libraries
 from .. import constants as Const
 from ..errors import AzadError
-from .python3 import Python3Generator, Python3Validator, Python3Solution
+from .abstract import (
+    AbstractExternalModule, AbstractProgrammingLanguage,
+    AbstractExternalGenerator, AbstractExternalValidator,
+    AbstractExternalSolution
+)
+from .python3 import (
+    AbstractPython3, Python3Generator,
+    Python3Validator, Python3Solution
+)
 
 _classes = {
     Const.SourceFileLanguage.Python3: {

@@ -70,6 +70,19 @@ def __IODataTypesInfo_FloatStrize(x: typing.Union[float, Decimal, Fraction]):
     return result
 
 
+def checkPrecision(a: float, b: float,
+                   precision: float = DefaultFloatPrecision) -> bool:
+    """
+    Check similarity between two float numbers with given precision.
+    """
+    if precision <= 0:
+        raise ValueError("Non-positive precision %f given" % (precision,))
+    elif abs(a) <= precision ** 2:
+        return abs(a - b) <= precision
+    else:
+        return abs(a - b) <= precision or abs((a - b) / a) <= precision
+
+
 class IOVariableTypes(Enum):
     """
     Enumeration of I/O variable types in task.
@@ -111,37 +124,43 @@ IODataTypesInfo = {
         "pytypes": (int,),
         "constraint": (lambda x: -(2**31) <= x <= 2**31 - 1),
         "strize": (lambda x: "%d" % (x,)),
+        "equal": (lambda x, y: x == y),
     },
     IOVariableTypes.LONG: {
         "pytypes": (int,),
         "constraint": (lambda x: -(2**63) <= x <= 2**63 - 1),
         "strize": (lambda x: "%d" % (x,)),
+        "equal": (lambda x, y: x == y),
     },
     IOVariableTypes.FLOAT: {
         "pytypes": (float, Decimal, Fraction, int),
         "constraint": (lambda x: 1.175494351e-38 <= abs(x) <= 3.402823466e38 or x == 0),
         "strize": __IODataTypesInfo_FloatStrize,
+        "equal": checkPrecision,
     },
     IOVariableTypes.DOUBLE: {
         "pytypes": (float, Decimal, Fraction, int),
         "constraint": (lambda x: float_info.min <= abs(x) <= float_info.max or x == 0),
         "strize": __IODataTypesInfo_FloatStrize,
+        "equal": checkPrecision,
     },
     IOVariableTypes.STRING: {
         "pytypes": (str,),
         "constraint": __IODataTypesInfo_StringConstraints,
         "strize": (lambda x: "\"%s\"" % (x.replace('"', '\\"'),)),
+        "equal": (lambda x, y: x == y),
     },
     IOVariableTypes.BOOL: {
         "pytypes": (bool, int),
         "constraint": (lambda x: isinstance(x, bool) or (x in (0, 1))),
         "strize": (lambda x: "true" if x else "false"),
+        "equal": (lambda x, y: x == y),
     }
 }
 for _iovt in IODataTypesInfo:
     _dtinfo = IODataTypesInfo[_iovt]
     assert isinstance(_dtinfo, dict)
-    assert set(_dtinfo.keys()) == {"pytypes", "constraint", "strize"}
+    assert set(_dtinfo.keys()) == {"pytypes", "constraint", "strize", "equal"}
     assert isinstance(_dtinfo["pytypes"], (list, tuple))
     for _t in _dtinfo["pytypes"]:
         assert isinstance(_t, type)
@@ -223,39 +242,6 @@ StartingConfigState = {
         "config": SupportedConfigVersion
     }
 }
-
-
-# Default statement
-DefaultStatement = """
-Write description here
-
----
-
-##### 제한사항
-
-* Write constraints here
-
----
-
-##### 입출력 예
-
-| param1 | param2 | ... | result |
-| --- | --- | --- | --- |
-| p1_1 | p2_1 | ... | result1 |
-| p1_2 | p2_2 | ... | result2 |
-
----
-
-##### 입출력 예 설명
-
-입출력 예 #1
-
-* Write notes about first example here
-
-입출력 예 #2
-
-* Write notes about second example here (if you need more then expand)
-"""
 
 
 # Log stuffs

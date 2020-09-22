@@ -58,7 +58,7 @@ class AbstractProgrammingLanguage:
         may be replaced in child class method.
         """
         result = {"ExitCode" + v.name: v.value
-                  for v in Const.IOVariableTypes}
+                  for v in Const.ExitCode}
         result.update(**kwargs)
         return result
 
@@ -85,7 +85,7 @@ class AbstractExternalModule:
         self.name = name
 
         # Prepare pipeline
-        logger.debug("Preparing pipeline for module '%s'..", name)
+        logger.debug("Preparing pipeline for module [%s]..", name)
         self.preparePipeline()
 
     @classmethod
@@ -203,9 +203,9 @@ class AbstractExternalGenerator(AbstractExternalModule):
         """
         if not self.prepared:
             raise OSError("Generator not prepared")
-        outfilePath = self.fs.newTempFile(extension="out")
+        outfilePath = self.fs.newTempFile(extension="data", namePrefix="in")
         args = self.generateArgs(outfilePath, genscript, self.modulePath)
-        errorLog = self.fs.newTempFile(extension="log")
+        errorLog = self.fs.newTempFile(extension="log", namePrefix="err")
         exitcode = self.invoke(args, stderr=errorLog, cwd=self.fs.basePath)
         return (exitcode, outfilePath, errorLog)
 
@@ -241,7 +241,7 @@ class AbstractExternalValidator(AbstractExternalModule):
         if not self.prepared:
             raise OSError("Generator not prepared")
         args = self.generateArgs(self.modulePath)
-        errorLog = self.fs.newTempFile(extension="log")
+        errorLog = self.fs.newTempFile(extension="log", namePrefix="err")
         exitcode = self.invoke(args, stdin=infile, stderr=errorLog,
                                cwd=self.fs.basePath)
         return (exitcode, None, errorLog)
@@ -279,9 +279,9 @@ class AbstractExternalSolution(AbstractExternalModule):
         """
         if not self.prepared:
             raise OSError("Generator not prepared")
-        outfilePath = self.fs.newTempFile(extension="out")
+        outfilePath = self.fs.newTempFile(extension="data", namePrefix="out")
         args = self.generateArgs(outfilePath, self.modulePath)
-        errorLog = self.fs.newTempFile(extension="log")
+        errorLog = self.fs.newTempFile(extension="log", namePrefix="err")
         exitcode = self.invoke(
             args, stdin=infile, stderr=errorLog,
             timelimit=timelimit, cwd=self.fs.basePath)

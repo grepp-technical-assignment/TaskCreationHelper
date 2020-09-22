@@ -6,11 +6,9 @@ This module is used to define and support I/O data (for problems) related stuffs
 import typing
 import os
 from pathlib import Path
-from decimal import Decimal
-from fractions import Fraction
 
 # Azad libraries
-from . import constants as Const, errors as Errors
+from . import constants as Const
 
 
 def cleanIOFilePath(path: typing.Union[str, Path],
@@ -88,3 +86,20 @@ def parseMulti(lines: typing.Iterator[str],
         if dimension > 1 and len(set(len(element) for element in result)) > 1:
             raise ValueError("Generated non-rectangle array")
         return result
+
+
+def isCorrectAnswer(answer, produced, returnType: Const.IOVariableTypes,
+                    dimension: int) -> bool:
+    """
+    Return if produced answer is correct.
+    """
+    if dimension > 0:
+        if not isinstance(produced, list) or len(answer) != len(produced):
+            return False
+        for element1, element2 in zip(answer, produced):
+            if not isCorrectAnswer(
+                    element1, element2, returnType, dimension - 1):
+                return False
+        return True
+    else:
+        return Const.IODataTypesInfo[returnType]["equal"](answer, produced)

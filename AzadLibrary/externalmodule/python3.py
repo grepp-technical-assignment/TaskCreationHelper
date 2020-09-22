@@ -34,6 +34,7 @@ class AbstractPython3(AbstractProgrammingLanguage):
             "str", "typing.List[str]", "typing.List[typing.List[str]]"]
     }
 
+    # Template file path
     generatorTemplatePath = Const.ResourcesPath / \
         "templates/generator_python3.template"
     solutionTemplatePath = Const.ResourcesPath / \
@@ -43,24 +44,35 @@ class AbstractPython3(AbstractProgrammingLanguage):
     ioHelperTemplatePath = Const.ResourcesPath / \
         "templates/tchio.py"
 
+    # Indent level
+    getParameterIndentLevel = 2
+    putParameterIndentLevel = 2
+
     @classmethod
     def templateDict(
             cls, parameterInfo: typing.List[typing.Tuple[
                 str, Const.IOVariableTypes, int]] = (),
             generatorPath: Path = None, validatorPath: Path = None,
             solutionPath: Path = None, ioHelperPath: Path = None,
+            returnInfo: Const.ReturnInfoType = None,
             **kwargs) -> dict:
 
         # Language-common state
         result = super().templateDict(**kwargs)
 
         # Get all parameters (for validator and solutions)
-        result["GetParameters"] = cls.leveledNewline(1).join(
+        result["GetParameters"] = cls.leveledNewline(cls.getParameterIndentLevel).join(
             cls.generateCodeGetParameter(*parameter) for parameter in parameterInfo)
 
         # Print all parameters (for generators)
-        result["PrintParameters"] = cls.leveledNewline(1).join(
+        result["PrintParameters"] = cls.leveledNewline(cls.putParameterIndentLevel).join(
             cls.generateCodePutParameter(*parameter) for parameter in parameterInfo)
+
+        # Result info
+        if returnInfo:
+            returnType, returnDimension = returnInfo
+            result["ReturnType"] = cls.typeStrTable[returnType][0]
+            result["ReturnDimension"] = returnDimension
 
         # Paths; At least one of these should be provided
         if not (isinstance(generatorPath, Path) or
@@ -92,7 +104,7 @@ class AbstractPython3(AbstractProgrammingLanguage):
             parameterDimension: int) -> str:
         tReal = cls.typeStrTable[parameterType][0]
         tHint = cls.typeStrTable[parameterType][parameterDimension]
-        return "inputValues[%s]: %s = TCHIO.parseMulti(inputLineIterator, %s, %d)" % \
+        return "inputValues['%s']: %s = TCHIO.parseMulti(inputLineIterator, %s, %d)" % \
             (variableName, tHint, tReal, parameterDimension)
 
     @classmethod
@@ -101,7 +113,7 @@ class AbstractPython3(AbstractProgrammingLanguage):
             parameterType: Const.IOVariableTypes,
             parameterDimension: int) -> str:
         tReal = cls.typeStrTable[parameterType][0]
-        return "TCHIO.printData(generated[%s], %s, %s, file = outfile); del generated[%s]" % \
+        return "TCHIO.printData(generated['%s'], %s, %s, file = outfile); del generated['%s']" % \
             (variableName, tReal, parameterDimension, variableName)
 
 
@@ -111,6 +123,14 @@ class Python3Generator(AbstractExternalGenerator, AbstractPython3):
 
     - argv: `[python3, modulepath, *super().argv]`
     """
+
+    # Indent level
+    getParameterIndentLevel = 3
+    putParameterIndentLevel = 3
+
+    def __init__(self, *args, ioHelperModulePath: Path = None, **kwargs):
+        self.ioHelperModulePath = ioHelperModulePath
+        super().__init__(*args, **kwargs)
 
     @classmethod
     def generateArgs(cls, outfile: typing.Union[str, Path],
@@ -134,9 +154,10 @@ class Python3Generator(AbstractExternalGenerator, AbstractPython3):
     def preparePipeline(self, *args, **kwargs):
         code = self.generateCode(
             self.originalModulePath, self.parameterInfo,
-            self.ioHelperTemplatePath)
+            self.ioHelperModulePath)
         self.modulePath = self.fs.newTempFile(
-            code, extension=Const.SourceFileLanguage.Python3.value)
+            code, extension=Const.SourceFileLanguage.Python3.value,
+            namePrefix="generator")
         self.prepared = True
 
 
@@ -146,6 +167,10 @@ class Python3Validator(AbstractExternalValidator, AbstractPython3):
 
     - argv: `[python3, modulepath, *super().argv]`
     """
+
+    def __init__(self, *args, ioHelperModulePath: Path = None, **kwargs):
+        self.ioHelperModulePath = ioHelperModulePath
+        super().__init__(*args, **kwargs)
 
     @classmethod
     def generateArgs(cls, modulePath: typing.Union[str, Path],
@@ -169,9 +194,10 @@ class Python3Validator(AbstractExternalValidator, AbstractPython3):
     def preparePipeline(self, *args, **kwargs):
         code = self.generateCode(
             self.originalModulePath, self.parameterInfo,
-            self.returnInfo, self.ioHelperTemplatePath)
+            self.returnInfo, self.ioHelperModulePath)
         self.modulePath = self.fs.newTempFile(
-            code, extension=Const.SourceFileLanguage.Python3.value)
+            code, extension=Const.SourceFileLanguage.Python3.value,
+            namePrefix="validator")
         self.prepared = True
 
 
@@ -181,6 +207,10 @@ class Python3Solution(AbstractExternalSolution, AbstractPython3):
 
     - argv: `[python3, modulepath, *super().argv]`
     """
+
+    def __init__(self, *args, ioHelperModulePath: Path = None, **kwargs):
+        self.ioHelperModulePath = ioHelperModulePath
+        super().__init__(*args, **kwargs)
 
     @classmethod
     def generateArgs(
@@ -200,13 +230,14 @@ class Python3Solution(AbstractExternalSolution, AbstractPython3):
             cls.templateDict(
                 parameterInfo=parameterInfo,
                 solutionPath=solutionPath, ioHelperPath=ioHelperPath,
-                **kwargs)
+                returnInfo=returnInfo, **kwargs)
         )
 
     def preparePipeline(self, *args, **kwargs):
         code = self.generateCode(
             self.originalModulePath, self.parameterInfo,
-            self.returnInfo, self.ioHelperTemplatePath)
+            self.returnInfo, self.ioHelperModulePath)
         self.modulePath = self.fs.newTempFile(
-            code, extension=Const.SourceFileLanguage.Python3.value)
+            code, extension=Const.SourceFileLanguage.Python3.value,
+            namePrefix="solution")
         self.prepared = True

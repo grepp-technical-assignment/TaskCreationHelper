@@ -41,8 +41,7 @@ class AbstractPython3(AbstractProgrammingLanguage):
         "templates/solution_python3.template"
     validatorTemplatePath = Const.ResourcesPath / \
         "templates/validator_python3.template"
-    ioHelperTemplatePath = Const.ResourcesPath / \
-        "templates/tchio.py"
+    ioHelperTemplatePath = Const.ResourcesPath / "helpers/tchio.py"
 
     # Indent level
     getParameterIndentLevel = 2

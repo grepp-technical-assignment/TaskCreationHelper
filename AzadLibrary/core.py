@@ -24,7 +24,7 @@ from . import (
 )
 from .misc import (
     validateVerdict, getAvailableCPUCount,
-    getExtension, runThreads)
+    getExtension, runThreads, pause)
 from .filesystem import TempFileSystem
 from .configparse import TaskConfiguration
 
@@ -109,12 +109,24 @@ class AzadCore:
         self.helperModules[Const.SourceFileLanguage.Python3]["io"] = \
             self.fs.copy(ExternalModule.AbstractPython3.ioHelperTemplatePath,
                          extension="py", namePrefix="helper")
+        self.helperModules[Const.SourceFileLanguage.Cpp]["io"] = \
+            self.fs.copy(ExternalModule.AbstractCpp.ioHelperHeaderTemplatePath,
+                         extension="hpp", namePrefix="helper")
+        self.helperModules[Const.SourceFileLanguage.Cpp]["random"] = \
+            self.fs.copy(ExternalModule.AbstractCpp.randomHelperHeaderTemplatePath,
+                         extension="hpp", namePrefix="helper")
 
         # Language specification for kwargs in getModule function
         _kwargs_lang_specification = {
             Const.SourceFileLanguage.Python3: {
                 "ioHelperModulePath":
                 self.helperModules[Const.SourceFileLanguage.Python3]["io"]
+            },
+            Const.SourceFileLanguage.Cpp: {
+                "ioHelperModulePath":
+                self.helperModules[Const.SourceFileLanguage.Cpp]["io"],
+                "randomHelperModulePath":
+                self.helperModules[Const.SourceFileLanguage.Cpp]["random"]
             }
         }
 
@@ -149,6 +161,7 @@ class AzadCore:
                 Const.SourceFileType.Generator,
                 "Generator %s" % (generatorName,),
                 namePrefix="origin_generator")
+            self.generatorModules[generatorName].preparePipeline()
 
         # Validator module
         if self.config.validator:
@@ -156,6 +169,7 @@ class AzadCore:
                 self.config.validator,
                 Const.SourceFileType.Validator, "Validator",
                 namePrefix="origin_validator")
+            self.validatorModule.preparePipeline()
 
         # Solution modules
         for categories in self.config.solutions:
@@ -165,6 +179,7 @@ class AzadCore:
                     path, Const.SourceFileType.Solution,
                     "Solution '%s'" % (path.name,),
                     namePrefix="origin_solution"))
+                self.solutionModules[categories][-1].preparePipeline()
 
     def generateInput(self) -> typing.List[Path]:
         """
@@ -475,11 +490,9 @@ class AzadCore:
 
         # Generate external codes
         self.prepareModules()
+        logger.info("Prepared all modules.")
         if mode is Const.AzadLibraryMode.GenerateCode:
-            while True:
-                line = input("Enter 'Q' to quit:")
-                if line.strip().upper() == 'Q':
-                    break
+            pause()
             return
 
         # Go full or produce?
@@ -487,6 +500,9 @@ class AzadCore:
         self.validateInput(inputDataFiles)
         answers = self.generateOutputs(
             inputDataFiles, mainACOnly=(mode is Const.AzadLibraryMode.Produce))
+        logger.info("Generated all answers%s",
+                    " and validated all solutions"
+                    if mode is Const.AzadLibraryMode.Full else "")
 
         # Write PGized I/O files
         IOData.cleanIOFilePath(self.config.IOPath)
@@ -494,3 +510,4 @@ class AzadCore:
         self.writePGOutFiles(answers)
         for file in inputDataFiles:
             self.fs.pop(file)
+        logger.info("PG-transformed and wrote all data into files.")

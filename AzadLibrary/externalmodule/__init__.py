@@ -13,8 +13,10 @@ from .abstract import (
     AbstractExternalSolution
 )
 from .python3 import (
-    AbstractPython3, Python3Generator,
-    Python3Validator, Python3Solution
+    AbstractPython3, Python3Generator, Python3Validator, Python3Solution
+)
+from .cpp import (
+    AbstractCpp, CppGenerator, CppSolution, CppValidator
 )
 
 _classes = {
@@ -22,6 +24,11 @@ _classes = {
         Const.SourceFileType.Generator: Python3Generator,
         Const.SourceFileType.Validator: Python3Validator,
         Const.SourceFileType.Solution: Python3Solution
+    },
+    Const.SourceFileLanguage.Cpp: {
+        Const.SourceFileType.Generator: CppGenerator,
+        Const.SourceFileType.Validator: CppValidator,
+        Const.SourceFileType.Solution: CppSolution,
     }
 }
 

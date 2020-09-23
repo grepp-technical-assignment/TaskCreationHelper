@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 from .. import constants as Const
 from ..filesystem import TempFileSystem
 from ..misc import isExistingFile
+from ..errors import AzadError
 
 
 class AbstractProgrammingLanguage:
@@ -51,7 +52,7 @@ class AbstractProgrammingLanguage:
         return cls.leveledNewline(level).join(lines)
 
     @classmethod
-    def templateDict(cls, **kwargs) -> dict:
+    def templateDict(cls, *args, **kwargs) -> dict:
         """
         Return dictionary to replace generated code.
         Be aware that some arguments passed by `kwargs`
@@ -61,6 +62,36 @@ class AbstractProgrammingLanguage:
                   for v in Const.ExitCode}
         result.update(**kwargs)
         return result
+
+    @classmethod
+    def generateCodeInitParameter(
+            cls, variableName: int,
+            parameterType: Const.IOVariableTypes,
+            parameterDimension: int) -> str:
+        """
+        Return statement `pType varName;`
+        """
+        raise NotImplementedError
+
+    @classmethod
+    def generateCodeGetParameter(
+            cls, variableName: int,
+            parameterType: Const.IOVariableTypes,
+            parameterDimension: int) -> str:
+        """
+        Return statement `pType varName = TCHIO.get(...);`.
+        """
+        raise NotImplementedError
+
+    @classmethod
+    def generateCodePutParameter(
+            cls, variableName: int,
+            parameterType: Const.IOVariableTypes,
+            parameterDimension: int) -> str:
+        """
+        Return statement `TCHIO.print(varName);`.
+        """
+        raise NotImplementedError
 
 
 class AbstractExternalModule:
@@ -82,14 +113,18 @@ class AbstractExternalModule:
         self.returnInfo = returnInfo
         self.prepared = False
         self.modulePath: Const.OptionalPath = None
+        self.executable: Path = None
         self.name = name
 
-        # Prepare pipeline
-        logger.debug("Preparing pipeline for module [%s]..", name)
-        self.preparePipeline()
+    @classmethod
+    def generateCompilationArgs(cls, *args, **kwargs) -> Const.ArgType:
+        """
+        Generate arguments to compile.
+        """
+        raise NotImplementedError
 
     @classmethod
-    def generateArgs(cls, *args, **kwargs) -> Const.ArgType:
+    def generateExecutionArgs(cls, *args, **kwargs) -> Const.ArgType:
         """
         Generate arguments to invoke.
         """
@@ -122,6 +157,11 @@ class AbstractExternalModule:
             if isExistingFile(stderr) else DEVNULL
         result = Const.ExitCode.GeneralUnintendedFail
 
+        # Make everything to be an absolute path
+        for i in range(len(args)):
+            if isinstance(args[i], Path):
+                args[i] = args[i].absolute()
+
         # Execute
         try:
             subprocess = Popen(
@@ -152,7 +192,7 @@ class AbstractExternalModule:
         """
         raise NotImplementedError
 
-    def preparePipeline(self, *args, **kwargs) -> None:
+    def preparePipeline(self) -> None:
         """
         The most abstract method of `preparePipeline`.
         Read each child class's abstract method for details.
@@ -181,7 +221,7 @@ class AbstractExternalGenerator(AbstractExternalModule):
     """
 
     @classmethod
-    def generateArgs(
+    def generateExecutionArgs(
             cls, outfile: typing.Union[str, Path], genscript: typing.List[str],
             modulePath: typing.Union[str, Path], *args, **kwargs) -> Const.ArgType:
         return [Path(modulePath), Path(outfile)] + genscript
@@ -202,9 +242,11 @@ class AbstractExternalGenerator(AbstractExternalModule):
         created in `self.fs` which contains generated input data.
         """
         if not self.prepared:
-            raise OSError("Generator not prepared")
+            raise AzadError("Generator not prepared")
         outfilePath = self.fs.newTempFile(extension="data", namePrefix="in")
-        args = self.generateArgs(outfilePath, genscript, self.modulePath)
+        args = self.generateExecutionArgs(
+            outfilePath, genscript,
+            self.executable if self.executable else self.modulePath)
         errorLog = self.fs.newTempFile(extension="log", namePrefix="err")
         exitcode = self.invoke(args, stderr=errorLog)
         return (exitcode, outfilePath, errorLog)
@@ -220,8 +262,8 @@ class AbstractExternalValidator(AbstractExternalModule):
     """
 
     @classmethod
-    def generateArgs(cls, modulePath: typing.Union[str, Path],
-                     *args, **kwargs) -> Const.ArgType:
+    def generateExecutionArgs(cls, modulePath: typing.Union[str, Path],
+                              *args, **kwargs) -> Const.ArgType:
         return [Path(modulePath)]
 
     @classmethod
@@ -239,8 +281,9 @@ class AbstractExternalValidator(AbstractExternalModule):
         Return exit code of validator subprocess.
         """
         if not self.prepared:
-            raise OSError("Generator not prepared")
-        args = self.generateArgs(self.modulePath)
+            self.preparePipeline()
+        args = self.generateExecutionArgs(
+            self.executable if self.executable else self.modulePath)
         errorLog = self.fs.newTempFile(extension="log", namePrefix="err")
         exitcode = self.invoke(args, stdin=infile, stderr=errorLog)
         return (exitcode, None, errorLog)
@@ -254,7 +297,7 @@ class AbstractExternalSolution(AbstractExternalModule):
     """
 
     @classmethod
-    def generateArgs(
+    def generateExecutionArgs(
             cls, outfile: Path, modulePath: typing.Union[str, Path],
             *args, **kwargs) -> Const.ArgType:
         return [Path(modulePath), Path(outfile)]
@@ -279,7 +322,8 @@ class AbstractExternalSolution(AbstractExternalModule):
         if not self.prepared:
             raise OSError("Generator not prepared")
         outfilePath = self.fs.newTempFile(extension="data", namePrefix="out")
-        args = self.generateArgs(outfilePath, self.modulePath)
+        args = self.generateExecutionArgs(
+            outfilePath, self.executable if self.executable else self.modulePath)
         errorLog = self.fs.newTempFile(extension="log", namePrefix="err")
         exitcode = self.invoke(
             args, stdin=infile, stderr=errorLog, timelimit=timelimit)

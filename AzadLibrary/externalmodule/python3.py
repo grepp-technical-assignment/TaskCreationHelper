@@ -9,6 +9,7 @@ from pathlib import Path
 # Azad libraries
 from .. import constants as Const
 from ..misc import isExistingFile, removeExtension
+from ..errors import AzadError
 from .abstract import (
     AbstractProgrammingLanguage, AbstractExternalGenerator,
     AbstractExternalValidator, AbstractExternalSolution)
@@ -44,12 +45,13 @@ class AbstractPython3(AbstractProgrammingLanguage):
     ioHelperTemplatePath = Const.ResourcesPath / "helpers/tchio.py"
 
     # Indent level
-    getParameterIndentLevel = 2
-    putParameterIndentLevel = 2
+    indentLevelGetParameter = 2
+    indentLevelPutParameter = 2
 
     @classmethod
     def templateDict(
-            cls, parameterInfo: typing.List[typing.Tuple[
+            cls, *args,
+            parameterInfo: typing.List[typing.Tuple[
                 str, Const.IOVariableTypes, int]] = (),
             generatorPath: Path = None, validatorPath: Path = None,
             solutionPath: Path = None, ioHelperPath: Path = None,
@@ -60,12 +62,12 @@ class AbstractPython3(AbstractProgrammingLanguage):
         result = super().templateDict(**kwargs)
 
         # Get all parameters (for validator and solutions)
-        result["GetParameters"] = cls.leveledNewline(cls.getParameterIndentLevel).join(
-            cls.generateCodeGetParameter(*parameter) for parameter in parameterInfo)
+        result["GetParameters"] = cls.leveledNewline(cls.indentLevelGetParameter).join(
+            cls.generateCodeGetParameter(*param) for param in parameterInfo)
 
         # Print all parameters (for generators)
-        result["PrintParameters"] = cls.leveledNewline(cls.putParameterIndentLevel).join(
-            cls.generateCodePutParameter(*parameter) for parameter in parameterInfo)
+        result["PrintParameters"] = cls.leveledNewline(cls.indentLevelPutParameter).join(
+            cls.generateCodePutParameter(*param) for param in parameterInfo)
 
         # Result info
         if returnInfo:
@@ -73,25 +75,19 @@ class AbstractPython3(AbstractProgrammingLanguage):
             result["ReturnType"] = cls.typeStrTable[returnType][0]
             result["ReturnDimension"] = returnDimension
 
-        # Paths; At least one of these should be provided
-        if not (isinstance(generatorPath, Path) or
-                isinstance(validatorPath, Path) or
-                isinstance(solutionPath, Path)):
-            raise OSError(
-                "None of Generator, Validator, Solution path are provided")
-
-        def registerPath(key: str, path: Path, force: bool = False):
-            if path or force:
+        def registerPath(key: str, path: Path):
+            if path:
                 if not isExistingFile(path):
                     raise OSError(
                         "Given path(key = %s, path = %s) isn't existing file" %
                         (key, path))
                 result[key] = removeExtension(path)
 
+        # Set paths
         registerPath("GeneratorPath", generatorPath)
         registerPath("ValidatorPath", validatorPath)
         registerPath("SolutionPath", solutionPath)
-        registerPath("PythonIOHelperPath", ioHelperPath, force=True)
+        registerPath("PythonIOHelperPath", ioHelperPath)
 
         # Return
         return result
@@ -119,25 +115,19 @@ class AbstractPython3(AbstractProgrammingLanguage):
 class Python3Generator(AbstractExternalGenerator, AbstractPython3):
     """
     Python3 implementation of external generator module.
+    `generateCompilationArgs` is not implemented,
+    because Python3 does not need compilation process.
 
     - argv: `[python3, modulepath, *super().argv]`
     """
 
     # Indent level
-    getParameterIndentLevel = 3
-    putParameterIndentLevel = 3
+    indentLevelGetParameter = 3
+    indentLevelPutParameter = 3
 
     def __init__(self, *args, ioHelperModulePath: Path = None, **kwargs):
-        self.ioHelperModulePath = ioHelperModulePath
         super().__init__(*args, **kwargs)
-
-    @classmethod
-    def generateArgs(cls, outfile: typing.Union[str, Path],
-                     genscript: typing.List[str],
-                     modulePath: typing.Union[str, Path],
-                     *args, **kwargs) -> Const.ArgType:
-        return ["python3", *super().generateArgs(
-            outfile, genscript, modulePath, *args, **kwargs)]
+        self.ioHelperModulePath = ioHelperModulePath
 
     @classmethod
     def generateCode(
@@ -150,7 +140,18 @@ class Python3Generator(AbstractExternalGenerator, AbstractPython3):
                 **kwargs)
         )
 
-    def preparePipeline(self, *args, **kwargs):
+    @classmethod
+    def generateExecutionArgs(
+            cls, outfile: typing.Union[str, Path],
+            genscript: typing.List[str],
+            modulePath: typing.Union[str, Path],
+            *args, **kwargs) -> Const.ArgType:
+        return ["python3", *super().generateExecutionArgs(
+            outfile, genscript, modulePath, *args, **kwargs)]
+
+    def preparePipeline(self):
+        if self.prepared:
+            raise AzadError("Already prepared")
         code = self.generateCode(
             self.originalModulePath, self.parameterInfo,
             self.ioHelperModulePath)
@@ -163,19 +164,15 @@ class Python3Generator(AbstractExternalGenerator, AbstractPython3):
 class Python3Validator(AbstractExternalValidator, AbstractPython3):
     """
     Python3 implementation of external validator module.
+    `generateCompilationArgs` is not implemented,
+    because Python3 does not need compilation process.
 
     - argv: `[python3, modulepath, *super().argv]`
     """
 
     def __init__(self, *args, ioHelperModulePath: Path = None, **kwargs):
-        self.ioHelperModulePath = ioHelperModulePath
         super().__init__(*args, **kwargs)
-
-    @classmethod
-    def generateArgs(cls, modulePath: typing.Union[str, Path],
-                     *args, **kwargs) -> Const.ArgType:
-        return ["python3",
-                *super().generateArgs(modulePath, *args, **kwargs)]
+        self.ioHelperModulePath = ioHelperModulePath
 
     @classmethod
     def generateCode(
@@ -183,14 +180,22 @@ class Python3Validator(AbstractExternalValidator, AbstractPython3):
             returnInfo: Const.ReturnInfoType, ioHelperPath: Path,
             *args, **kwargs) -> str:
         return cls.replaceSymbols(
-            cls.validatorTemplatePath,
-            cls.templateDict(
+            cls.validatorTemplatePath, cls.templateDict(
                 parameterInfo=parameterInfo,
                 validatorPath=validatorPath, ioHelperPath=ioHelperPath,
                 **kwargs)
         )
 
-    def preparePipeline(self, *args, **kwargs):
+    @classmethod
+    def generateExecutionArgs(
+            cls, modulePath: typing.Union[str, Path],
+            *args, **kwargs) -> Const.ArgType:
+        return ["python3",
+                *super().generateExecutionArgs(modulePath, *args, **kwargs)]
+
+    def preparePipeline(self):
+        if self.prepared:
+            raise AzadError("Already prepared")
         code = self.generateCode(
             self.originalModulePath, self.parameterInfo,
             self.returnInfo, self.ioHelperModulePath)
@@ -203,20 +208,15 @@ class Python3Validator(AbstractExternalValidator, AbstractPython3):
 class Python3Solution(AbstractExternalSolution, AbstractPython3):
     """
     Python3 implementation of external solution module.
+    `generateCompilationArgs` is not implemented,
+    because Python3 does not need compilation process.
 
     - argv: `[python3, modulepath, *super().argv]`
     """
 
     def __init__(self, *args, ioHelperModulePath: Path = None, **kwargs):
-        self.ioHelperModulePath = ioHelperModulePath
         super().__init__(*args, **kwargs)
-
-    @classmethod
-    def generateArgs(
-            cls, outfile: Path, modulePath: typing.Union[str, Path],
-            *args, **kwargs) -> Const.ArgType:
-        return ["python3",
-                *super().generateArgs(outfile, modulePath, *args, **kwargs)]
+        self.ioHelperModulePath = ioHelperModulePath
 
     @classmethod
     def generateCode(
@@ -225,14 +225,22 @@ class Python3Solution(AbstractExternalSolution, AbstractPython3):
             returnInfo: Const.ReturnInfoType,
             ioHelperPath: Path, *args, **kwargs) -> str:
         return cls.replaceSymbols(
-            cls.solutionTemplatePath,
-            cls.templateDict(
+            cls.solutionTemplatePath, cls.templateDict(
                 parameterInfo=parameterInfo,
                 solutionPath=solutionPath, ioHelperPath=ioHelperPath,
                 returnInfo=returnInfo, **kwargs)
         )
 
-    def preparePipeline(self, *args, **kwargs):
+    @classmethod
+    def generateExecutionArgs(
+            cls, outfile: Path, modulePath: typing.Union[str, Path],
+            *args, **kwargs) -> Const.ArgType:
+        return ["python3", *super().generateExecutionArgs(
+            outfile, modulePath, *args, **kwargs)]
+
+    def preparePipeline(self):
+        if self.prepared:
+            raise AzadError("Already prepared")
         code = self.generateCode(
             self.originalModulePath, self.parameterInfo,
             self.returnInfo, self.ioHelperModulePath)

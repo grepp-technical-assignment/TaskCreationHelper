@@ -229,5 +229,21 @@ def runThreads(func: typing.Callable[..., typing.Any],
     return endTime - startTime
 
 
+def pause(err: Exception = None, condition: str = "Q"):
+    """
+    Wait for user's response on standard input.
+    This function is used for debug only.
+    """
+    if isinstance(err, BaseException):
+        logger.error(
+            "Exception catched: %s / %s", type(err), err.args)
+    condition = condition.upper().strip()
+    q = input("Type '%s' and press enter to continue.. ")
+    while q.upper().strip() != condition:
+        q = input()
+    if isinstance(err, BaseException):
+        raise err.with_traceback(err.__traceback__)
+
+
 if __name__ == "__main__":
     print(longEndSkip(str([i for i in range(10**4)])))

@@ -1,0 +1,52 @@
+// TCH Helper
+#include "$CppIOHelperPath"
+
+// Solution module
+#include "$SolutionHeaderPath"
+
+// Standard libraries
+#include <iostream>
+#include <fstream>
+#include <vector>
+#include <string>
+#include <stdexcept>
+
+// Main function
+int main(int argc, char **argv){
+
+    // Get input and parse
+    $InitParameters;
+    try{
+        $GetParameters;
+    }
+    catch(std::runtime_error err){
+        std::cerr << "Failed to parsing parameters on solution: "
+            << err.what() << std::endl;
+        return $ExitCodeInputParsingError;
+    }
+
+    // Execution
+    $ReturnType result;
+    try{
+        result = solution($SendParameters);
+    }
+    catch(std::runtime_error err){
+        std::cerr << "Solution function failed: "
+            << err.what() << std::endl;
+        return $ExitCodeSolutionFailed;
+    }
+
+    // Print out
+    try{
+        std::ofstream outfile(argv[1]);
+        TCH::put${ReturnDimension}d<$ReturnTypeBase>(outfile, result);
+    }
+    catch(std::runtime_error err){
+        std::cerr << "Failed to print result on solution"
+            << err.what() << std::endl;
+        return $ExitCodeWrongTypeGenerated;
+    }
+
+    // Success
+    return $ExitCodeSuccess;
+}

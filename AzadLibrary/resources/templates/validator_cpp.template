@@ -1,0 +1,39 @@
+// TCH Helper
+#include "$CppIOHelperPath"
+
+// Validator module
+#include "$ValidatorHeaderPath"
+
+// Standard libraries
+#include <iostream>
+#include <vector>
+#include <string>
+#include <stdexcept>
+
+// Main function
+int main(int argc, char **argv){
+
+    // Get input and parse
+    $InitParameters;
+    try{
+        $GetParameters;
+    }
+    catch(std::runtime_error err){
+        std::cerr << "Failed to parsing parameters on solution: "
+            << err.what() << std::endl;
+        return $ExitCodeInputParsingError;
+    }
+
+    // Validate
+    try{
+        validate($SendParameters);
+    }
+    catch(std::runtime_error err){
+        std::err << "Validation failed: "
+            << err.what() << std::endl;
+        return $ExitCodeValidatorFailed;
+    }
+
+    // Success
+    return $ExitCodeSuccess;
+}

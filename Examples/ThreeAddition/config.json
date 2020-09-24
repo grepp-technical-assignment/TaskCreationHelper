@@ -1,0 +1,56 @@
+{
+    "name": "Three Variable Addition",
+    "author": "McDic",
+    "parameters": [
+        {
+            "name": "a",
+            "type": "long",
+            "dimension": 0
+        },
+        {
+            "name": "b",
+            "type": "long",
+            "dimension": 0
+        },
+        {
+            "name": "c",
+            "type": "long",
+            "dimension": 0
+        }
+    ],
+    "return": {
+        "type": "long",
+        "dimension": 0
+    },
+    "limits": {
+        "time": 5.0,
+        "memory": 1024
+    },
+    "solutions": {
+        "AC": ["solution.py", "solution.cpp"],
+        "WA": ["wrong_answer.py", "wrong_answer.cpp"],
+        "TLE": ["tle.py", "tle.cpp"],
+        "FAIL": ["fail.py"]
+    },
+    "generators": {
+        "pure": "generator_pure.cpp",
+        "manual": "generator_manual.py"
+    },
+    "genscript": [
+        "manual 1", "manual 2", "// manual 3",
+        "pure 123456789", "pure 12345678987654321",
+        "pure 123456789", "pure 12345678987654321"
+    ],
+    "log": "azadlib.log",
+    "iofiles": {
+        "path": "IO",
+        "inputsyntax": "%02d.in.txt",
+        "outputsyntax": "%02d.out.txt"
+    },
+    "validator": "validator.cpp",
+    "precision": 1e-06,
+    "version": {
+        "problem": 1.0,
+        "config": 1.0
+    }
+}

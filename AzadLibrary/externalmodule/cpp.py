@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 # Azad libraries
 from .. import constants as Const
-from ..misc import isExistingFile, removeExtension, pause
+from ..misc import isExistingFile, removeExtension
 from ..errors import AzadError
 from .abstract import (
     AbstractProgrammingLanguage, AbstractExternalGenerator,
@@ -54,8 +54,7 @@ class AbstractCpp(AbstractProgrammingLanguage):
         "templates/solution_cpp_header.template"
     validatorHeaderTemplatePath = Const.ResourcesPath / \
         "templates/validator_cpp_header.template"
-    ioHelperHeaderTemplatePath = Const.ResourcesPath / "helpers/tchio.hpp"
-    randomHelperHeaderTemplatePath = Const.ResourcesPath / "helpers/tchrand.hpp"
+    helperHeadersPath = Const.ResourcesPath / "helpers"
 
     # Indent level
     indentLevelParameterInit = 1
@@ -72,8 +71,6 @@ class AbstractCpp(AbstractProgrammingLanguage):
             generatorHeaderPath: Path = None,
             solutionHeaderPath: Path = None,
             validatorHeaderPath: Path = None,
-            ioHelperHeaderPath: Path = None,
-            randomHelperHeaderPath: Path = None,
             returnInfo: Const.ReturnInfoType = None,
             **kwargs) -> dict:
 
@@ -121,9 +118,8 @@ class AbstractCpp(AbstractProgrammingLanguage):
         registerPath("GeneratorHeaderPath", generatorHeaderPath)
         registerPath("SolutionHeaderPath", solutionHeaderPath)
         registerPath("ValidatorHeaderPath", validatorHeaderPath)
-        registerPath("CppIOHelperPath", ioHelperHeaderPath)
-        registerPath("CppRandomHelperPath", randomHelperHeaderPath)
 
+        # Return
         return result
 
     @classmethod
@@ -167,31 +163,20 @@ class CppGenerator(AbstractExternalGenerator, AbstractCpp):
     - argv: `[executable, *super().argv]`
     """
 
-    def __init__(self, *args,
-                 ioHelperModulePath: Path = None,
-                 randomHelperModulePath: Path = None,
-                 **kwargs):
-        super().__init__(*args, **kwargs)
-        self.ioHelperModulePath = ioHelperModulePath
-        self.randomHelperModulePath = randomHelperModulePath
-
     @classmethod
     def generateCompilationArgs(
             cls, mainModulePath: Path, executable: Path,
-            originalModulePath: Path, originalModuleHeaderPath: Path,
-            ioHelperModulePath: Path, randomHelperModulePath: Path,
-            *args, **kwargs) -> Const.ArgType:
+            originalModulePath: Path, *args, **kwargs) -> Const.ArgType:
         return [
             "g++", "-Wall", "-std=c++17", "-O2",
-            ioHelperModulePath, randomHelperModulePath,
-            originalModuleHeaderPath, originalModulePath,
-            mainModulePath, "-o", executable
+            "-I", cls.helperHeadersPath,
+            mainModulePath, originalModulePath,
+            "-o", executable
         ]
 
     @classmethod
     def generateCode(
             cls, generatorPath: Path, parameterInfo: Const.ParamInfoList,
-            ioHelperHeaderPath: Path, randomHelperHeaderPath: Path,
             *args, **kwargs) -> str:
         """
         Consider `generatorPath` as `generatorHeaderPath`.
@@ -199,9 +184,7 @@ class CppGenerator(AbstractExternalGenerator, AbstractCpp):
         return cls.replaceSymbols(
             cls.generatorTemplatePath, cls.templateDict(
                 parameterInfo=parameterInfo,
-                generatorHeaderPath=generatorPath,
-                ioHelperHeaderPath=ioHelperHeaderPath,
-                randomHelperHeaderPath=randomHelperHeaderPath)
+                generatorHeaderPath=generatorPath)
         )
 
     def preparePipeline(self):
@@ -216,12 +199,7 @@ class CppGenerator(AbstractExternalGenerator, AbstractCpp):
             filename=removeExtension(self.originalModulePath.name),
             extension="hpp"
         )
-        code = self.generateCode(
-            originalModuleHeaderPath,
-            self.parameterInfo,
-            self.ioHelperModulePath,
-            self.randomHelperModulePath
-        )
+        code = self.generateCode(originalModuleHeaderPath, self.parameterInfo)
         self.modulePath = self.fs.newTempFile(
             content=code, extension="cpp", namePrefix="generator")
 
@@ -229,10 +207,7 @@ class CppGenerator(AbstractExternalGenerator, AbstractCpp):
         self.executable = self.fs.newTempFile(
             extension="exe", namePrefix="generator")
         compilationArgs = self.generateCompilationArgs(
-            self.modulePath, self.executable,
-            self.originalModulePath, originalModuleHeaderPath,
-            self.ioHelperModulePath, self.randomHelperModulePath
-        )
+            self.modulePath, self.executable, self.originalModulePath)
         compilationErrorLog = self.fs.newTempFile(
             extension="log", namePrefix="err")
         compilationExitCode = self.invoke(
@@ -243,8 +218,8 @@ class CppGenerator(AbstractExternalGenerator, AbstractCpp):
                 logger.error("Generator '%s' compilation failed (args = %s), log:\n%s",
                              self.originalModulePath, compilationArgs,
                              errLogFile.read())
-            raise AzadError("Compilation failed (args = %s)" %
-                            (compilationArgs,))
+            raise AzadError(
+                "Compilation failed (args = %s)" % (compilationArgs,))
 
         self.prepared = True
 
@@ -258,33 +233,21 @@ class CppValidator(AbstractExternalValidator, AbstractCpp):
     - argv: `[executable, *super().argv]`
     """
 
-    def __init__(self, *args,
-                 ioHelperModulePath: Path = None,
-                 randomHelperModulePath: Path = None,
-                 **kwargs):
-        super().__init__(*args, **kwargs)
-        self.ioHelperModulePath = ioHelperModulePath
-        self.randomHelperModulePath = randomHelperModulePath
-        self.moduleHeaderPath: Path = None
-
     @classmethod
-    def generateCompilationArgs(  # Same as CppGenerator
+    def generateCompilationArgs(
             cls, mainModulePath: Path, executable: Path,
-            originalModulePath: Path, originalModuleHeaderPath: Path,
-            ioHelperModulePath: Path, randomHelperModulePath: Path,
-            *args, **kwargs) -> Const.ArgType:
+            originalModulePath: Path, *args, **kwargs) -> Const.ArgType:
         return [
             "g++", "-Wall", "-std=c++17", "-O2",
-            ioHelperModulePath, randomHelperModulePath,
-            originalModuleHeaderPath, originalModulePath,
-            mainModulePath, "-o", executable
+            "-I", cls.helperHeadersPath,
+            mainModulePath, originalModulePath,
+            "-o", executable
         ]
 
     @classmethod
     def generateCode(
             cls, validatorPath: Path, parameterInfo: Const.ParamInfoList,
             returnInfo: Const.ReturnInfoType,
-            ioHelperHeaderPath: Path, randomHelperHeaderPath: Path,
             *args, **kwargs) -> str:
         """
         Consider `validatorPath` as `validatorHeaderPath`.
@@ -293,8 +256,6 @@ class CppValidator(AbstractExternalValidator, AbstractCpp):
             cls.validatorTemplatePath, cls.templateDict(
                 parameterInfo=parameterInfo,
                 validatorHeaderPath=validatorPath,
-                ioHelperHeaderPath=ioHelperHeaderPath,
-                randomHelperHeaderPath=randomHelperHeaderPath,
                 returnInfo=returnInfo)
         )
 
@@ -312,10 +273,7 @@ class CppValidator(AbstractExternalValidator, AbstractCpp):
         )
         code = self.generateCode(
             originalModuleHeaderPath,
-            self.parameterInfo, self.returnInfo,
-            self.ioHelperModulePath,
-            self.randomHelperModulePath
-        )
+            self.parameterInfo, self.returnInfo)
         self.modulePath = self.fs.newTempFile(
             content=code, extension="cpp", namePrefix="validator")
 
@@ -323,10 +281,7 @@ class CppValidator(AbstractExternalValidator, AbstractCpp):
         self.executable = self.fs.newTempFile(
             extension="exe", namePrefix="validator")
         compilationArgs = self.generateCompilationArgs(
-            self.modulePath, self.executable,
-            self.originalModulePath, originalModuleHeaderPath,
-            self.ioHelperModulePath, self.randomHelperModulePath
-        )
+            self.modulePath, self.executable, self.originalModulePath)
         compilationErrorLog = self.fs.newTempFile(
             extension="log", namePrefix="err")
         compilationExitCode = self.invoke(
@@ -337,8 +292,8 @@ class CppValidator(AbstractExternalValidator, AbstractCpp):
                 logger.error("Validator '%s' compilation failed (args = %s), log:\n%s",
                              self.originalModulePath, compilationArgs,
                              errLogFile.read())
-            raise AzadError("Compilation failed (args = %s)" %
-                            (compilationArgs,))
+            raise AzadError(
+                "Compilation failed (args = %s)" % (compilationArgs,))
 
         self.prepared = True
 
@@ -352,33 +307,21 @@ class CppSolution(AbstractExternalSolution, AbstractCpp):
     - argv: `[executable, *super().argv]`
     """
 
-    def __init__(self, *args,
-                 ioHelperModulePath: Path = None,
-                 randomHelperModulePath: Path = None,
-                 **kwargs):
-        super().__init__(*args, **kwargs)
-        self.ioHelperModulePath = ioHelperModulePath
-        self.randomHelperModulePath = randomHelperModulePath
-        self.moduleHeaderPath: Path = None
-
     @classmethod
-    def generateCompilationArgs(  # Same as CppGenerator
+    def generateCompilationArgs(
             cls, mainModulePath: Path, executable: Path,
-            originalModulePath: Path, originalModuleHeaderPath: Path,
-            ioHelperModulePath: Path, randomHelperModulePath: Path,
-            *args, **kwargs) -> Const.ArgType:
+            originalModulePath: Path, *args, **kwargs) -> Const.ArgType:
         return [
             "g++", "-Wall", "-std=c++17", "-O2",
-            ioHelperModulePath, randomHelperModulePath,
-            originalModuleHeaderPath, originalModulePath,
-            mainModulePath, "-o", executable
+            "-I", cls.helperHeadersPath,
+            mainModulePath, originalModulePath,
+            "-o", executable
         ]
 
     @classmethod
     def generateCode(
             cls, solutionPath: Path, parameterInfo: Const.ParamInfoList,
             returnInfo: Const.ReturnInfoType,
-            ioHelperHeaderPath: Path, randomHelperHeaderPath: Path,
             *args, **kwargs) -> str:
         """
         Consider `solutionPath` as `solutionHeaderPath`.
@@ -387,8 +330,6 @@ class CppSolution(AbstractExternalSolution, AbstractCpp):
             cls.solutionTemplatePath, cls.templateDict(
                 parameterInfo=parameterInfo,
                 solutionHeaderPath=solutionPath,
-                ioHelperHeaderPath=ioHelperHeaderPath,
-                randomHelperHeaderPath=randomHelperHeaderPath,
                 returnInfo=returnInfo)
         )
 
@@ -408,10 +349,7 @@ class CppSolution(AbstractExternalSolution, AbstractCpp):
         )
         code = self.generateCode(
             originalModuleHeaderPath,
-            self.parameterInfo, self.returnInfo,
-            self.ioHelperModulePath,
-            self.randomHelperModulePath
-        )
+            self.parameterInfo, self.returnInfo)
         self.modulePath = self.fs.newTempFile(
             content=code, extension="cpp", namePrefix="solution")
 
@@ -420,9 +358,7 @@ class CppSolution(AbstractExternalSolution, AbstractCpp):
             extension="exe", namePrefix="solution")
         compilationArgs = self.generateCompilationArgs(
             self.modulePath, self.executable,
-            self.originalModulePath, originalModuleHeaderPath,
-            self.ioHelperModulePath, self.randomHelperModulePath
-        )
+            self.originalModulePath, originalModuleHeaderPath)
         compilationErrorLog = self.fs.newTempFile(
             extension="log", namePrefix="err")
         compilationExitCode = self.invoke(

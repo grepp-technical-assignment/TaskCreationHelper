@@ -109,24 +109,12 @@ class AzadCore:
         self.helperModules[Const.SourceFileLanguage.Python3]["io"] = \
             self.fs.copy(ExternalModule.AbstractPython3.ioHelperTemplatePath,
                          extension="py", namePrefix="helper")
-        self.helperModules[Const.SourceFileLanguage.Cpp]["io"] = \
-            self.fs.copy(ExternalModule.AbstractCpp.ioHelperHeaderTemplatePath,
-                         extension="hpp", namePrefix="helper")
-        self.helperModules[Const.SourceFileLanguage.Cpp]["random"] = \
-            self.fs.copy(ExternalModule.AbstractCpp.randomHelperHeaderTemplatePath,
-                         extension="hpp", namePrefix="helper")
 
         # Language specification for kwargs in getModule function
         _kwargs_lang_specification = {
             Const.SourceFileLanguage.Python3: {
                 "ioHelperModulePath":
                 self.helperModules[Const.SourceFileLanguage.Python3]["io"]
-            },
-            Const.SourceFileLanguage.Cpp: {
-                "ioHelperModulePath":
-                self.helperModules[Const.SourceFileLanguage.Cpp]["io"],
-                "randomHelperModulePath":
-                self.helperModules[Const.SourceFileLanguage.Cpp]["random"]
             }
         }
 
@@ -162,6 +150,7 @@ class AzadCore:
                 "Generator %s" % (generatorName,),
                 namePrefix="origin_generator")
             self.generatorModules[generatorName].preparePipeline()
+            logger.debug("Prepared generator \"%s\".", generatorName)
 
         # Validator module
         if self.config.validator:
@@ -170,6 +159,7 @@ class AzadCore:
                 Const.SourceFileType.Validator, "Validator",
                 namePrefix="origin_validator")
             self.validatorModule.preparePipeline()
+            logger.debug("Prepared validator.")
 
         # Solution modules
         for categories in self.config.solutions:
@@ -180,6 +170,7 @@ class AzadCore:
                     "Solution '%s'" % (path.name,),
                     namePrefix="origin_solution"))
                 self.solutionModules[categories][-1].preparePipeline()
+                logger.debug("Prepared solution \"%s\".", path)
 
     def generateInput(self) -> typing.List[Path]:
         """

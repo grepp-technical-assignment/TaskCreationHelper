@@ -29,7 +29,7 @@ int main(int argc, char **argv){
         validate($SendParameters);
     }
     catch(std::runtime_error err){
-        std::err << "Validation failed: "
+        std::cerr << "Validation failed: "
             << err.what() << std::endl;
         return $ExitCodeValidatorFailed;
     }

@@ -14,7 +14,7 @@ from $GeneratorPath import generate
 def main(*argv):
 
     # Fix seed
-    genscript = argv[1:]
+    genscript = argv[2:]
     hashValue = hashlib.sha256("|".join(genscript).encode()).hexdigest()
     random.seed(hashValue)
 
@@ -29,7 +29,7 @@ def main(*argv):
         exit($ExitCodeGeneratorFailed)
     
     # Print out
-    with open(Path(argv[0]), "w") as outfile:
+    with open(Path(argv[1]), "w") as outfile:
         try:
             $PrintParameters
         except KeyError as err:
@@ -53,4 +53,4 @@ def main(*argv):
 
 
 if __name__ == "__main__":
-    main(*sys.argv[1:])
+    main(*sys.argv)

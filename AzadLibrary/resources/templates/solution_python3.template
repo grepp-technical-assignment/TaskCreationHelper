@@ -35,7 +35,7 @@ def main(*argv):
 
     # Print out
     try:
-        with open(Path(argv[0]), "w") as outfile:
+        with open(Path(argv[1]), "w") as outfile:
             TCHIO.printData(result, $ReturnType, 
                 $ReturnDimension, file = outfile)
     except (TypeError, AssertionError, ValueError) as err:
@@ -47,4 +47,4 @@ def main(*argv):
 
 
 if __name__ == "__main__":
-    main(*sys.argv[1:])
+    main(*sys.argv)

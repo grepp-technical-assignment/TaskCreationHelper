@@ -17,7 +17,7 @@ int main(int argc, char **argv){
 
     // Fix seed
     std::vector<std::string> genscript;
-    for(int i=1; i<argc; i++) genscript.push_back(std::string(argv[i]));
+    for(int i=2; i<argc; i++) genscript.push_back(std::string(argv[i]));
     TCH::seed(genscript);
 
     // Execution

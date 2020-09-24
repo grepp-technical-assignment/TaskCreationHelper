@@ -1,5 +1,5 @@
-#ifndef __TCH_IO
-#define __TCH_IO
+#ifndef __TCH_IO_HEADER
+#define __TCH_IO_HEADER
 
 #include <iostream>
 #include <vector>

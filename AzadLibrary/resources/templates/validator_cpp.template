@@ -1,5 +1,5 @@
 // TCH Helper
-#include "$CppIOHelperPath"
+#include "tchio.hpp"
 
 // Validator module
 #include "$ValidatorHeaderPath"

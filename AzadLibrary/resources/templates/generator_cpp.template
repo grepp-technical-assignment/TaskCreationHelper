@@ -1,6 +1,6 @@
 // TCH Helpers
-#include "$CppIOHelperPath"
-#include "$CppRandomHelperPath"
+#include "tchio.hpp"
+#include "tchrand.hpp"
 
 // Generator module
 #include "$GeneratorHeaderPath"

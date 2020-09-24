@@ -1,5 +1,5 @@
 // TCH Helper
-#include "$CppIOHelperPath"
+#include "tchio.hpp"
 
 // Solution module
 #include "$SolutionHeaderPath"

@@ -1,7 +1,7 @@
 [TaskCreationHelper run.py usage]
 
 Basic syntax: 
-- python3 run.py <subcommand> [args..]
+- python3 run.py <subcommand> [config.json path] [args..]
 
 List of subcommands:
 - help: Print this documentation.

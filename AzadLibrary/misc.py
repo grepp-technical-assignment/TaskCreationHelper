@@ -13,7 +13,6 @@ import time
 import typing
 from pathlib import Path
 import threading
-import traceback
 
 logger = logging.getLogger(__name__)
 
@@ -67,13 +66,7 @@ def validateVerdict(
     """
     Validate verdict with intended categories.
     """
-    # Fill unfilled categories
-    for category in intendedCategories:
-        if category not in verdictCount:
-            verdictCount[category] = 0
-
-    # Check
-    foundFeasibleCategories = set()  # This should not be empty
+    foundFeasibleCategories = set()  # This should be non-empty
     for category in verdictCount:
         if not isinstance(category, Const.Verdict):
             raise TypeError(

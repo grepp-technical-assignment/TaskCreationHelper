@@ -10,7 +10,7 @@
 namespace TCH{
 
     // Random generator engine
-    static std::mt19937_64 mersenneTwister;
+    inline std::mt19937_64 mersenneTwister;
 
     // Set seed of engine. This should be called before generator function.
     inline void seed(const std::vector<std::string> &genscript){

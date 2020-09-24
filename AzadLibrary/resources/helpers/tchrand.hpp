@@ -10,10 +10,10 @@
 namespace TCH{
 
     // Random generator engine
-    std::mt19937_64 mersenneTwister;
+    static std::mt19937_64 mersenneTwister;
 
     // Set seed of engine. This should be called before generator function.
-    void seed(const std::vector<std::string> &genscript){
+    inline void seed(const std::vector<std::string> &genscript){
         if(genscript.empty()) throw std::runtime_error("Empty genscript given");
 
         // Join all strings in genscript
@@ -29,25 +29,27 @@ namespace TCH{
     }
 
     // Return uniform integer on range [l, r].
-    template <typename intlike> intlike randint(intlike l, intlike r){
+    template <typename intlike> 
+    inline intlike randint(intlike l, intlike r){
         std::uniform_int_distribution<intlike> distrib(l, r);
         return distrib(mersenneTwister);
     }
 
     // Return uniform real number on range [l, r).
-    template <typename reallike> reallike randreal(reallike l, reallike r){
+    template <typename reallike> 
+    inline reallike randreal(reallike l, reallike r){
         std::uniform_real_distribution<reallike> distrib(l, r);
         return distrib(mersenneTwister);
     }
 
     // Return True or False randomly.
-    bool randbool(){
+    inline bool randbool(){
         std::uniform_int_distribution<int> distrib(0, 1);
         return (bool)distrib(mersenneTwister);
     }
 
     // Generate random permutation with given size.
-    std::vector<int> generatePermutation(int size){
+    inline std::vector<int> generatePermutation(int size){
         if(size <= 0) throw "Non-positive size given";
         std::vector<int> result(size);
         for(int i=0; i<size; i++) result[i] = i;
@@ -58,7 +60,8 @@ namespace TCH{
     }
 
     // Shuffle between two iterators.
-    template <class iterator> void shuffle(iterator begin, iterator end){
+    template <class iterator> 
+    inline void shuffle(iterator begin, iterator end){
         int size = std::distance<iterator>(begin, end);
         if(size < 0) throw "End iterator is at before begin iterator";
         else if(size == 0) return;

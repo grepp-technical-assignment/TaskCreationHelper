@@ -14,7 +14,7 @@ from pathlib import Path
 
 
 # Azad Library Version
-AzadLibraryVersion = "0.4.3"
+AzadLibraryVersion = "0.4.4"
 
 
 # Config defaults

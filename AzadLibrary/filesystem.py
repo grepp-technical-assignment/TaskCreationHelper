@@ -12,7 +12,7 @@ import threading
 import logging
 
 # Azad libraries
-from .misc import randomName
+from .misc import randomName, formatPathForLog
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +44,7 @@ class TempFileSystem:
         # Extra
         atexit.register(self.close, force=True)
         logger.info("Temporary filesystem based on '%s' is created.",
-                    self.basePath)
+                    formatPathForLog(self.basePath))
 
     def __findFeasiblePath(
             self, extension: str = "temp", randomNameLength: int = None,
@@ -107,6 +107,8 @@ class TempFileSystem:
             with open(tempFilePath, "wb" if isBytes else "w") as tempFile:
                 if content is not None:
                     tempFile.write(content)
+
+        logger.debug("Temp file '%s' created.", formatPathForLog(tempFilePath))
         return tempFilePath
 
     def copy(self, origin: typing.Union[str, Path],
@@ -128,6 +130,9 @@ class TempFileSystem:
                     extension=extension, randomNameLength=randomNameLength,
                     namePrefix=namePrefix)
             shutil.copyfile(origin, tempFilePath)
+
+        logger.debug("Temp file '%s' created by copying from '%s'.",
+                     formatPathForLog(tempFilePath), formatPathForLog(origin))
         return tempFilePath
 
     def pop(self, filePath: typing.Union[str, Path], b: bool = False) \
@@ -155,6 +160,8 @@ class TempFileSystem:
             except FileNotFoundError:
                 pass
             else:
+                logger.debug("Temp file '%s' popped.",
+                             formatPathForLog(filePath))
                 return result
 
     def close(self, force: bool = False):
@@ -169,7 +176,7 @@ class TempFileSystem:
         def doIt():
             logger.info(
                 "Temporary filesystem based on '%s' is closing..",
-                self.basePath)
+                formatPathForLog(self.basePath))
             self.closed = True
             self.tempFiles.clear()
             shutil.rmtree(self.basePath)

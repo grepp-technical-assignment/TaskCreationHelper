@@ -13,6 +13,7 @@ import time
 import typing
 from pathlib import Path
 import threading
+import copy
 
 logger = logging.getLogger(__name__)
 
@@ -234,6 +235,17 @@ def pause(condition: str = "Q"):
     q = input("Type '%s' and press enter to continue.. " % (condition,))
     while q.upper().strip() != condition:
         q = input()
+
+
+def formatPathForLog(path: Path, maxDepth: int = 3) -> str:
+    """
+    Format given path to string for log file.
+    """
+    base = copy.deepcopy(path)
+    for _ in range(maxDepth):
+        base = base.parent
+    return ("" if base is base.parent else "...") + \
+        str(path.relative_to(base))
 
 
 if __name__ == "__main__":

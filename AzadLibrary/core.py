@@ -24,7 +24,7 @@ from . import (
 )
 from .misc import (
     validateVerdict, getAvailableCPUCount,
-    getExtension, runThreads, pause)
+    getExtension, runThreads, pause, formatPathForLog)
 from .filesystem import TempFileSystem
 from .configparse import TaskConfiguration
 
@@ -51,7 +51,8 @@ class AzadCore:
 
         # Let's go
         logger.info("Azad Library Version is %s", Const.AzadLibraryVersion)
-        logger.info("Current directory is %s", os.getcwd())
+        logger.info("Current directory is %s",
+                    formatPathForLog(Path(os.getcwd())))
 
         # Upper bound of number of threads
         CPUcount = getAvailableCPUCount()
@@ -167,10 +168,11 @@ class AzadCore:
             for path in self.config.solutions[categories]:
                 self.solutionModules[categories].append(getModule(
                     path, Const.SourceFileType.Solution,
-                    "Solution '%s'" % (path.name,),
+                    "Solution '%s'" % (formatPathForLog(path),),
                     namePrefix="origin_solution"))
                 self.solutionModules[categories][-1].preparePipeline()
-                logger.debug("Prepared solution \"%s\".", path)
+                logger.debug("Prepared solution \"%s\".",
+                             formatPathForLog(path))
 
     def generateInput(self) -> typing.List[Path]:
         """
@@ -405,7 +407,8 @@ class AzadCore:
             self.solutionModules[AConly][0]
         answerFiles: typing.List[Path] = self.generateOutput(
             mainACModule, inputFiles, AConly, compare=False,
-            solutionName="MAIN (%s)" % (self.config.solutions[AConly][0],))
+            solutionName="MAIN (%s)" %
+            (formatPathForLog(self.config.solutions[AConly][0]),))
 
         # Constraint validation
         answers = []
@@ -432,7 +435,7 @@ class AzadCore:
                         continue
                     result = self.generateOutput(
                         module, inputFiles, category, answers=answers,
-                        solutionName=str(self.config.solutions[category][i]))
+                        solutionName=formatPathForLog(self.config.solutions[category][i]))
                     for outfilePath in result:  # Also remove outfiles
                         self.fs.pop(outfilePath)
                     gc.collect()
@@ -449,7 +452,7 @@ class AzadCore:
         for i in range(len(inFiles)):
             outPath = self.config.IOPath / \
                 (self.config.inputFilePathSyntax % (i + 1,))
-            logger.debug("Writing '%s'..", outPath)
+            logger.debug("Writing '%s'..", formatPathForLog(outPath))
             with open(inFiles[i], "r") as inputFile:
                 iterator = IOData.yieldLines(inputFile)
                 data = [IOData.parseMulti(iterator, paramType, dimension)
@@ -467,7 +470,7 @@ class AzadCore:
         for i in range(len(answers)):
             outPath = self.config.IOPath / \
                 (self.config.outputFilePathSyntax % (i + 1,))
-            logger.debug("Writing '%s'..", outPath)
+            logger.debug("Writing '%s'..", formatPathForLog(outPath))
             with open(outPath, "w") as outFile:
                 outFile.write(IOData.PGizeData(
                     answers[i], self.config.returnType))

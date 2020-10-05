@@ -52,11 +52,12 @@ namespace TCH{
         if(size < 0) throw std::runtime_error("Non-negative size");
         std::vector<t> result;
         while(size--) result.push_back(get0d<t>(in));
+        return result;
     }
 
     // Get 2d array from input.
     template <typename t> 
-    inline std::vector<std::vector<t>> get2d(std::istream &in, bool validateRec){
+    inline std::vector<std::vector<t>> get2d(std::istream &in, bool validateRec = true){
         int size; in >> size;
         if(size < 0) throw std::runtime_error("Non-negative size");
         std::vector<std::vector<t>> result;
@@ -92,7 +93,7 @@ namespace TCH{
 
     // Put 2d array to output.
     template <typename t>
-    inline void put2d(std::ostream &out, const std::vector<std::vector<t>> &val, bool validateRec){
+    inline void put2d(std::ostream &out, const std::vector<std::vector<t>> &val, bool validateRec = true){
         if(validateRec) if(!validateRectangle<t>(val))
             throw std::runtime_error("Given array is not rectangle");
         put0d<size_t>(out, val.size());

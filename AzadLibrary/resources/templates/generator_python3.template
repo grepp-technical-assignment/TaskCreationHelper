@@ -29,7 +29,7 @@ def main(*argv):
         exit($ExitCodeGeneratorFailed)
     
     # Print out
-    with open(Path(argv[1]), "w") as outfile:
+    with open(Path(argv[1]), "w", encoding = "ascii") as outfile:
         try:
             $PrintParameters
         except KeyError as err:
@@ -37,7 +37,7 @@ def main(*argv):
             exit($ExitCodeGeneratorFailed)
         except (TypeError, AssertionError, ValueError) as err:
             TCHIO.printException(err)
-            exit($ExitCodeGeneratorFailed)
+            exit($ExitCodeWrongTypeGenerated)
 
     # Check if there is any extra parameter generated
     try:

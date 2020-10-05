@@ -13,10 +13,7 @@ from $SolutionPath import solution
 def main(*argv):
 
     # Get input and parse
-    def inputEndless():
-        while True:
-            yield input()
-    inputLineIterator = inputEndless()
+    inputLineIterator = TCHIO.yieldInputLines(sys.stdin)
     inputValues = {}
     try:
         $GetParameters
@@ -35,7 +32,7 @@ def main(*argv):
 
     # Print out
     try:
-        with open(Path(argv[1]), "w") as outfile:
+        with open(Path(argv[1]), "w", encoding = "ascii") as outfile:
             TCHIO.printData(result, $ReturnType, 
                 $ReturnDimension, file = outfile)
     except (TypeError, AssertionError, ValueError) as err:

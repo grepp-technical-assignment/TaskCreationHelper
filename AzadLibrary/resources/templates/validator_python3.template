@@ -12,10 +12,7 @@ from $ValidatorPath import validate
 def main(*argv):
 
     # Get input and parse
-    def inputEndless():
-        while True:
-            yield input()
-    inputLineIterator = inputEndless()
+    inputLineIterator = TCHIO.yieldInputLines(sys.stdin)
     inputValues = {}
     try:
         $GetParameters

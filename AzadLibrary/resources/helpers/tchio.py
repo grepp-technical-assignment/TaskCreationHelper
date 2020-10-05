@@ -5,6 +5,13 @@ from fractions import Fraction
 import traceback
 
 
+def yieldInputLines(file: typing.IO[str]):
+    """
+    Yield each line from input.
+    """
+    yield from file.read().split("\n")
+
+
 def parseSingle(line: str, targetType: type) \
         -> typing.Union[int, float, bool]:
     """

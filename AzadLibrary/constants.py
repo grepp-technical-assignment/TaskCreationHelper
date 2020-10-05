@@ -27,6 +27,10 @@ DefaultTimeLimit = 5.0  # seconds
 DefaultMemoryLimit = 1024  # megabytes
 MaxParameterDimensionAllowed = 2
 
+# Generator, Validator related
+DefaultGeneratorTL = 10.0
+DefaultValidatorTL = 10.0
+
 # Log related
 DefaultLoggingFileName = "azadlib.log"
 DefaultLogFileMaxSize = 10 * (2 ** 20)  # 10MB

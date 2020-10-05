@@ -248,7 +248,8 @@ class AbstractExternalGenerator(AbstractExternalModule):
             outfilePath, genscript,
             self.executable if self.executable else self.modulePath)
         errorLog = self.fs.newTempFile(extension="log", namePrefix="err")
-        exitcode = self.invoke(args, stderr=errorLog)
+        exitcode = self.invoke(args, stderr=errorLog,
+                               timelimit=Const.DefaultGeneratorTL)
         return (exitcode, outfilePath, errorLog)
 
 
@@ -285,7 +286,8 @@ class AbstractExternalValidator(AbstractExternalModule):
         args = self.generateExecutionArgs(
             self.executable if self.executable else self.modulePath)
         errorLog = self.fs.newTempFile(extension="log", namePrefix="err")
-        exitcode = self.invoke(args, stdin=infile, stderr=errorLog)
+        exitcode = self.invoke(args, stdin=infile, stderr=errorLog,
+                               timelimit=Const.DefaultValidatorTL)
         return (exitcode, None, errorLog)
 
 

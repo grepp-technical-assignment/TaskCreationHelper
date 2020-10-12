@@ -5,6 +5,11 @@
 #include <stdexcept>
 #include "tchio.hpp"
 
+// Disable default assertion
+#ifdef assert
+#undef assert
+#endif
+
 namespace TCH{
 
     // Raise an error with msg if given condition is false.

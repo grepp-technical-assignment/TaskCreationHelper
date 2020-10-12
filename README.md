@@ -24,7 +24,7 @@ All things above are possible in only one command. All dirty background jobs wil
 
 ## Run: `run.py`
 
-You can use TCH by running `run.py`. Enter `python3 run.py help` on terminal to learn usage. Also, please check out `Examples` folder to look showcases.
+You can use TCH by running `run.py`. Enter `python3 run.py --help` on terminal to learn usage. Also, please check out `Examples` folder to look showcases.
 
 ## Configuration: `config.json`
 
@@ -62,9 +62,10 @@ Initialize problem folder with Azad library, then you will get sample configurat
 
 These are currently unsupported, but targetted to be supported in future.
 
-- (WIP) Cross language sourcefile execution(C++17, Python3, etc)
+- Cross language sourcefile execution for current unsupported languages
 - `config.json` versioning
 - Customized answer checker
+- Safe virtualization using Docker or something similar
 
 # Concept Details
 
@@ -137,3 +138,6 @@ There are two types of I/O Data Protocol in TCH.
 - Now supports cross language execution. Also changed fundamental background of concurrency again.
 - Supported languages: Python3, C++17
 
+## v0.5: Unspecified Title
+
+- Now `run.py` is opt-parsing; You can pass options via dash highlighting.

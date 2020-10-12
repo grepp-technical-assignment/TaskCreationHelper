@@ -3,11 +3,12 @@ from copy import deepcopy
 import json
 import re
 import os
-from sys import argv
+import sys
 from pathlib import Path
 import warnings
 import logging
 import atexit
+import argparse
 
 # Main Execution
 if __name__ == "__main__":
@@ -15,19 +16,46 @@ if __name__ == "__main__":
     # Azad library
     from AzadLibrary import AzadCore
     import AzadLibrary.constants as Const
-    from AzadLibrary.misc import barLine
+    from AzadLibrary.misc import barLine, pause
 
-    subcommand = argv[1] if len(argv) > 1 else "help"
+    # Check Python version first
+    currentPythonVersion = (
+        sys.version_info.major, sys.version_info.minor, sys.version_info.micro)
+    if currentPythonVersion < Const.MinimumPythonVersion:
+        currentPythonVersionStr = ".".join(
+            str(c) for c in currentPythonVersion)
+        minimumPythonVersionStr = ".".join(
+            str(c) for c in Const.MinimumPythonVersion)
+        raise Exception(
+            "Failed to qualify Python version; Given %s < Minimum %s" %
+            (currentPythonVersionStr, minimumPythonVersionStr))
+
+    # Create argument parser and parse it
+    argParser = argparse.ArgumentParser(prog="TaskCreationHelper")
+    argParser.add_argument(
+        "-i", "--init", help="Initialize Problem Repository", action="store_true")
+    argParser.add_argument(
+        "-l", "--level",
+        help="Specify the level of TCH execution (generate - produce - full)",
+        default="full")
+    argParser.add_argument(
+        "-c", "--config", help="Give the path to the config.json or folder")
+    argParser.add_argument(
+        "-v", "--version", help="Show the version of TCH", action="version",
+        version="TaskCreationHelper v%s" % (Const.AzadLibraryVersion,))
+    argParser.add_argument(
+        "-p", "--pause_on_err", help="Pause on error", action="store_true")
+    parsedResult = argParser.parse_args(sys.argv[1:])
+
+    # Bar line
     print(barLine("Azad Library"))
     atexit.register(print, barLine("Azad Library Termination"))
     logging.captureWarnings(True)
 
-    if subcommand == "help":  # Help
-        with open(Const.ResourcesPath / "etc/help.txt", "r") as helpFile:
-            print(helpFile.read())
+    # Interactive initialization
+    if parsedResult.init:
 
-    elif subcommand == "init":  # Interactive initialization
-
+        # Create basic information
         startInformation = deepcopy(Const.StartingConfigState)
         print("Let's initialize new problem folder.")
         print("Current location is \"%s\"." % (os.getcwd(),))
@@ -57,10 +85,12 @@ if __name__ == "__main__":
                     as defaultStatementFile:
                 statementFile.write(defaultStatementFile.read())
 
-    elif subcommand in ("full", "produce", "generate"):  # Actual run process
+    # Actual run process
+    elif parsedResult.level in ("full", "produce", "generate"):
 
         # Check config.json file
-        configFilePath = Path(argv[2] if len(argv) > 2 else os.getcwd())
+        configFilePath = Path(
+            parsedResult.config if parsedResult.config else os.getcwd())
         if not configFilePath.exists():
             raise FileNotFoundError(
                 "Given path %s not found" %
@@ -68,7 +98,7 @@ if __name__ == "__main__":
         elif configFilePath.is_file():
             if not configFilePath.name.endswith("config.json"):
                 warnings.warn("Given file name is not config.json")
-        else:  # path is directory
+        else:  # Given path is directory
             configFilePath = configFilePath / "config.json"
             if not configFilePath.exists():
                 raise FileNotFoundError("%s not found" % (configFilePath,))
@@ -79,10 +109,17 @@ if __name__ == "__main__":
             "full": Const.AzadLibraryMode.Full,
             "produce": Const.AzadLibraryMode.Produce,
             "generate": Const.AzadLibraryMode.GenerateCode,
-        }[subcommand]
-        Core.run(mode)
+        }[parsedResult.level]
+
+        # On exception, pause or not?
+        if parsedResult.pause_on_err:
+            try:
+                Core.run(mode)
+            except BaseException:
+                pause()
+        else:
+            Core.run(mode)
 
     else:
         raise ValueError(
-            "Given subcommand %s is not valid. Please try \"python3 run.py help\"." %
-            (subcommand,))
+            "Given subcommand %s is not valid." % (parsedResult.level,))

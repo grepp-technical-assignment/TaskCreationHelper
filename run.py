@@ -13,12 +13,8 @@ import argparse
 # Main Execution
 if __name__ == "__main__":
 
-    # Azad library
-    from AzadLibrary import AzadCore
-    import AzadLibrary.constants as Const
-    from AzadLibrary.misc import barLine, pause
-
     # Check Python version first
+    import AzadLibrary.constants as Const
     currentPythonVersion = (
         sys.version_info.major, sys.version_info.minor, sys.version_info.micro)
     if currentPythonVersion < Const.MinimumPythonVersion:
@@ -48,6 +44,7 @@ if __name__ == "__main__":
     parsedResult = argParser.parse_args(sys.argv[1:])
 
     # Bar line
+    from AzadLibrary.misc import barLine, pause
     print(barLine("Azad Library"))
     atexit.register(print, barLine("Azad Library Termination"))
     logging.captureWarnings(True)
@@ -104,6 +101,7 @@ if __name__ == "__main__":
                 raise FileNotFoundError("%s not found" % (configFilePath,))
 
         # Run total pipeline
+        from AzadLibrary import AzadCore
         Core = AzadCore(configFilePath)
         mode: Const.AzadLibraryMode = {
             "full": Const.AzadLibraryMode.Full,

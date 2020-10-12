@@ -494,7 +494,7 @@ class AzadCore:
         self.validateInput(inputDataFiles)
         answers = self.generateOutputs(
             inputDataFiles, mainACOnly=(mode is Const.AzadLibraryMode.Produce))
-        logger.info("Generated all answers%s",
+        logger.info("Generated all answers%s.",
                     " and validated all solutions"
                     if mode is Const.AzadLibraryMode.Full else "")
 

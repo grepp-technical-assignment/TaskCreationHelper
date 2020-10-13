@@ -222,7 +222,7 @@ class AzadCore:
                         errorLogFile.read())
             else:  # Even if exit code is success, try parsing
                 try:
-                    with open(inputDataPath, "r") as inputFile:
+                    with open(inputDataPath, "r", encoding="ascii") as inputFile:
                         iterator = IOData.yieldLines(inputFile)
                         for _0, iovt, dimension in self.config.parameters:
                             IOData.parseMulti(iterator, iovt, dimension)
@@ -343,12 +343,12 @@ class AzadCore:
         for i in range(len(inputFiles)):
             exitcode, outfilePath, _2 = result[i]
             verdict = Const.Verdict.FAIL
-            if exitcode is Const.ExitCode.Success:
+            if exitcode is Const.ExitCode.Success:  # AC/WA
                 if not compare:
                     verdict = Const.Verdict.AC
                 else:
                     answer = answers[i]
-                    with open(outfilePath, "r") as outfile:
+                    with open(outfilePath, "r", encoding="ascii") as outfile:
                         iterator = IOData.yieldLines(outfile)
                         produced = IOData.parseMulti(
                             iterator, self.config.returnType,
@@ -371,21 +371,40 @@ class AzadCore:
             for v, r in zip(verdicts, result)))
         verdictCount = {verdict: verdicts.count(verdict)
                         for verdict in Const.Verdict}
+
+        # What if verdict is wrong?
         if not validateVerdict(verdictCount, *intendedCategories):
+
+            # Report for all wrong verdict indices
             for i in range(len(inputFiles)):
                 verdict = verdicts[i]
                 if verdict is not Const.Verdict.AC and \
                         verdict not in intendedCategories:
-                    with open(result[i][2], "r") as errLogFile:
+
+                    # Print error log
+                    with open(result[i][1] if verdict is Const.Verdict.WA
+                              else result[i][2], "r",
+                              encoding="ascii" if verdict is Const.Verdict.WA
+                              else "utf-8") as errLogFile:
                         errLogContent = errLogFile.read()
+                        if verdict is Const.Verdict.WA:
+                            errLogContent = "Produced = " + str(IOData.parseMulti(
+                                iter(errLogContent.split("\n")),
+                                self.config.returnType,
+                                self.config.returnDimension))
                     logger.error(
                         "Solution '%s' produced wrong verdict %s on test #%d; Report: \n%s",
                         solutionName, verdict, i + 1, errLogContent)
                     del errLogContent
+                    gc.collect()
+
+            # Raise exception
             raise Errors.WrongSolutionFileCategory(
                 "Solution '%s' does not worked as intended(%s)." %
                 (solutionName, ",".join(str(s) for s in intendedCategories)))
-        else:  # Success, now let's remove error log.
+
+        # Success, now let's remove error log.
+        else:
             for _0, _1, errLog in result:
                 self.fs.pop(errLog)
             gc.collect()
@@ -415,7 +434,7 @@ class AzadCore:
         for i in range(len(answerFiles)):
             answerFile = answerFiles[i]
             try:
-                with open(answerFile, "r") as file:
+                with open(answerFile, "r", encoding="ascii") as file:
                     iterator = IOData.yieldLines(file)
                     answers.append(IOData.parseMulti(
                         iterator, self.config.returnType,
@@ -453,11 +472,11 @@ class AzadCore:
             outPath = self.config.IOPath / \
                 (self.config.inputFilePathSyntax % (i + 1,))
             logger.debug("Writing '%s'..", formatPathForLog(outPath))
-            with open(inFiles[i], "r") as inputFile:
+            with open(inFiles[i], "r", encoding="ascii") as inputFile:
                 iterator = IOData.yieldLines(inputFile)
                 data = [IOData.parseMulti(iterator, paramType, dimension)
                         for (_0, paramType, dimension) in self.config.parameters]
-                with open(outPath, "w") as outFile:
+                with open(outPath, "w", encoding="ascii") as outFile:
                     outFile.write(",".join(
                         IOData.PGizeData(e, t)
                         for e, (_0, t, _2) in zip(data, self.config.parameters)))
@@ -471,7 +490,7 @@ class AzadCore:
             outPath = self.config.IOPath / \
                 (self.config.outputFilePathSyntax % (i + 1,))
             logger.debug("Writing '%s'..", formatPathForLog(outPath))
-            with open(outPath, "w") as outFile:
+            with open(outPath, "w", encoding="ascii") as outFile:
                 outFile.write(IOData.PGizeData(
                     answers[i], self.config.returnType))
 

@@ -472,9 +472,9 @@ class AzadCore:
             iterator = IOData.yieldLines(inFiles[i])
             data = [IOData.parseMulti(iterator, paramType, dimension)
                     for (_0, paramType, dimension) in self.config.parameters]
-            with open(outPath, "w", encoding="ascii") as outFile:
-                outFile.write(",".join(
-                    IOData.PGizeData(e, t)
+            with open(outPath, "wb") as outFile:
+                outFile.write(b','.join(
+                    IOData.PGizeData(e, t).encode('ascii')
                     for e, (_0, t, _2) in zip(data, self.config.parameters)))
 
     def writePGOutFiles(self, answers: list):
@@ -486,9 +486,9 @@ class AzadCore:
             outPath = self.config.IOPath / \
                 (self.config.outputFilePathSyntax % (i + 1,))
             logger.debug("Writing '%s'..", formatPathForLog(outPath))
-            with open(outPath, "w", encoding="ascii") as outFile:
+            with open(outPath, "wb") as outFile:
                 outFile.write(IOData.PGizeData(
-                    answers[i], self.config.returnType))
+                    answers[i], self.config.returnType).encode('ascii'))
 
     def run(self, mode: Const.AzadLibraryMode):
         """

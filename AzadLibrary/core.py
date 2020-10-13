@@ -222,10 +222,9 @@ class AzadCore:
                         errorLogFile.read())
             else:  # Even if exit code is success, try parsing
                 try:
-                    with open(inputDataPath, "r", encoding="ascii") as inputFile:
-                        iterator = IOData.yieldLines(inputFile)
-                        for _0, iovt, dimension in self.config.parameters:
-                            IOData.parseMulti(iterator, iovt, dimension)
+                    iterator = IOData.yieldLines(inputDataPath)
+                    for _0, iovt, dimension in self.config.parameters:
+                        IOData.parseMulti(iterator, iovt, dimension)
                 except (StopIteration, TypeError, ValueError) as err:
                     logger.error("Error raised while parsing input data #%d (genscript = \"%s\")",
                                  i + 1, self.config.genscripts[i])
@@ -348,11 +347,10 @@ class AzadCore:
                     verdict = Const.Verdict.AC
                 else:
                     answer = answers[i]
-                    with open(outfilePath, "r", encoding="ascii") as outfile:
-                        iterator = IOData.yieldLines(outfile)
-                        produced = IOData.parseMulti(
-                            iterator, self.config.returnType,
-                            self.config.returnDimension)
+                    produced = IOData.parseMulti(
+                        IOData.yieldLines(outfilePath),
+                        self.config.returnType,
+                        self.config.returnDimension)
                     verdict = Const.Verdict.AC if IOData.isCorrectAnswer(
                         answer, produced,
                         self.config.returnType,
@@ -434,11 +432,10 @@ class AzadCore:
         for i in range(len(answerFiles)):
             answerFile = answerFiles[i]
             try:
-                with open(answerFile, "r", encoding="ascii") as file:
-                    iterator = IOData.yieldLines(file)
-                    answers.append(IOData.parseMulti(
-                        iterator, self.config.returnType,
-                        self.config.returnDimension))
+                answers.append(IOData.parseMulti(
+                    IOData.yieldLines(answerFile),
+                    self.config.returnType,
+                    self.config.returnDimension))
                 self.fs.pop(answerFile)
             except (ValueError, TypeError) as err:  # Produced wrong data
                 logger.error("Main solution produced wrong data on #%d", i + 1)
@@ -472,14 +469,13 @@ class AzadCore:
             outPath = self.config.IOPath / \
                 (self.config.inputFilePathSyntax % (i + 1,))
             logger.debug("Writing '%s'..", formatPathForLog(outPath))
-            with open(inFiles[i], "r", encoding="ascii") as inputFile:
-                iterator = IOData.yieldLines(inputFile)
-                data = [IOData.parseMulti(iterator, paramType, dimension)
-                        for (_0, paramType, dimension) in self.config.parameters]
-                with open(outPath, "w", encoding="ascii") as outFile:
-                    outFile.write(",".join(
-                        IOData.PGizeData(e, t)
-                        for e, (_0, t, _2) in zip(data, self.config.parameters)))
+            iterator = IOData.yieldLines(inFiles[i])
+            data = [IOData.parseMulti(iterator, paramType, dimension)
+                    for (_0, paramType, dimension) in self.config.parameters]
+            with open(outPath, "w", encoding="ascii") as outFile:
+                outFile.write(",".join(
+                    IOData.PGizeData(e, t)
+                    for e, (_0, t, _2) in zip(data, self.config.parameters)))
 
     def writePGOutFiles(self, answers: list):
         """

@@ -25,15 +25,13 @@ def cleanIOFilePath(path: typing.Union[str, Path],
                 break
 
 
-def yieldLines(file: typing.IO[str]) -> typing.Iterator[str]:
+def yieldLines(path: typing.Union[str, Path]) -> typing.Iterator[str]:
     """
     Read and yield each line until to reach end of file.
     """
-    while True:
-        line: str = file.readline()
-        if line == '':
-            break
-        yield line.replace("\n", "")
+    with open(path, "rb") as file:
+        content = file.read()
+    yield from (b.decode('ascii') for b in content.split(b"\n"))
 
 
 def PGizeData(data, iovt: Const.IOVariableTypes) -> str:

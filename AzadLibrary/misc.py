@@ -162,25 +162,6 @@ def isExistingFile(path: Path) -> bool:
     return isinstance(path, Path) and path.exists() and path.is_file()
 
 
-def zipUnzipByOrders(*iterators):
-    """
-    Combine all iterators into single iterators.
-    >>> list(zipUnzipByOrders([1,2],[3,4,5,6],[7,8,9]))
-    [1,3,7,2,4,8,5,9,6]
-    """
-    iterators = [iter(it) for it in iterators]
-    while iterators:
-        dead = set()
-        for i in range(len(iterators)):
-            try:
-                yield next(iterators[i])
-            except StopIteration:
-                dead.add(i)
-        if dead:
-            iterators = [iterators[i] for i in range(len(iterators))
-                         if i not in dead]
-
-
 def getExtension(path: typing.Union[str, Path]) -> typing.Union[str, None]:
     """
     Return given path's file extension if exists.

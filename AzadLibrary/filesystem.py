@@ -43,7 +43,7 @@ class TempFileSystem:
 
         # Extra
         atexit.register(self.close, force=True)
-        logger.info("Temporary filesystem based on '%s' is created.",
+        logger.info("Temporary filesystem based on \"%s\" is created.",
                     formatPathForLog(self.basePath))
 
     def __findFeasiblePath(
@@ -108,7 +108,8 @@ class TempFileSystem:
                 if content is not None:
                     tempFile.write(content)
 
-        logger.debug("Temp file '%s' created.", formatPathForLog(tempFilePath))
+        logger.debug(
+            "Temp file \"%s\" created.", formatPathForLog(tempFilePath))
         return tempFilePath
 
     def copy(self, origin: typing.Union[str, Path],
@@ -131,7 +132,7 @@ class TempFileSystem:
                     namePrefix=namePrefix)
             shutil.copyfile(origin, tempFilePath)
 
-        logger.debug("Temp file '%s' created by copying from '%s'.",
+        logger.debug("Temp file \"%s\" created by copying from \"%s\".",
                      formatPathForLog(tempFilePath), formatPathForLog(origin))
         return tempFilePath
 
@@ -160,7 +161,7 @@ class TempFileSystem:
             except FileNotFoundError:
                 pass
             else:
-                logger.debug("Temp file '%s' popped.",
+                logger.debug("Temp file \"%s\" popped.",
                              formatPathForLog(filePath))
                 return result
 
@@ -175,7 +176,7 @@ class TempFileSystem:
         # Actual termination process
         def doIt():
             logger.info(
-                "Temporary filesystem based on '%s' is closing..",
+                "Temporary filesystem based on \"%s\" is closing..",
                 formatPathForLog(self.basePath))
             self.closed = True
             self.tempFiles.clear()

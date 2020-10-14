@@ -195,11 +195,13 @@ class AzadCore:
             results[index] = module.run(genscript)
 
         # Do multiprocessing
-        timeDiff, _ = runThreads(
+        timeDiff, dtDistribution = runThreads(
             run, self.concurrencyCount,
             *[((i,), {}) for i in range(len(self.config.genscripts))],
             funcName="Generation")
         logger.info("Finished all generation in %g seconds.", timeDiff)
+        logger.debug("DT: [%s]", ", ".join(
+            "%g" % dt for dt in dtDistribution))
 
         # Check if there is any failure
         failedIndices = []
@@ -296,7 +298,7 @@ class AzadCore:
             raise ValueError("Different length of provided file lists")
 
         # Prepare stuffs
-        logger.info("Starting solution '%s'..", solutionName)
+        logger.info("Starting solution \"%s\"..", solutionName)
         result: typing.List[Const.EXOO] = \
             [(None, None, None) for _ in inputFiles]
 
@@ -311,16 +313,16 @@ class AzadCore:
                 memorylimit=self.config.ML)
 
         # Do multithreading
-        timeDiff, _ = runThreads(
+        timeDiff, dtDistribution = runThreads(
             run, self.concurrencyCount,
             *[((i,), {}) for i in range(len(inputFiles))],
             funcName="Solution '%s'" % (solutionName,))
-        logger.info("Finished all solution '%s' process in %g seconds.",
+        logger.info("Finished solution \"%s\" in %g seconds.",
                     solutionName, timeDiff)
 
         # Determine verdicts
-        logger.debug("Analyzing verdicts of solution '%s' (intended %s)..",
-                     solutionName, ", ".join(c.name for c in intendedCategories))
+        logger.debug("Analyzing verdicts (intended %s)..",
+                     ", ".join(c.name for c in intendedCategories))
         verdicts: typing.List[Const.Verdict] = []
         for i in range(len(inputFiles)):
             exitcode, outfilePath, _2 = result[i]
@@ -350,6 +352,8 @@ class AzadCore:
             "%s" % (v.name,) if v is not Const.Verdict.FAIL
             else "%s(%s)" % (v.name, r[0].name)
             for v, r in zip(verdicts, result)))
+        logger.debug("DT: [%s]", ", ".join(
+            "%g" % dt for dt in dtDistribution))
         verdictCount = {verdict: verdicts.count(verdict)
                         for verdict in Const.Verdict}
 

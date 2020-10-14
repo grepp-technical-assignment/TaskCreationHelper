@@ -213,12 +213,12 @@ def runThreads(
         but with several additional functionalities.
         """
         with semaphore:
-            logger.debug("Running %s #%d..", funcName, index)
+            logger.debug("Running %s #%d..", funcName, index + 1)
             startTime = time.perf_counter()
             func(*args, **kwargs)
             endTime = time.perf_counter()
             logger.debug("Finishing %s #%d in %gs.. (Global dt)",
-                         funcName, index, endTime - startTime)
+                         funcName, index + 1, endTime - startTime)
         dtDistribution[index] = endTime - startTime
 
     # Make, run, and join threads

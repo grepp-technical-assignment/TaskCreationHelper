@@ -14,6 +14,7 @@ import typing
 from pathlib import Path
 import threading
 import copy
+import resource
 
 logger = logging.getLogger(__name__)
 
@@ -195,8 +196,7 @@ def runThreads(
     concurrencyLimit: int,
     *argss: typing.Tuple[tuple, ...],
     timeout: float = None,
-    funcName: str = "unknown",
-    timeMeasureGlobal: bool = False) \
+    funcName: str = "unknown") \
         -> typing.Tuple[float, typing.List[float]]:
     """
     Run multiple threads on same function but different arguments.
@@ -214,12 +214,10 @@ def runThreads(
         """
         with semaphore:
             logger.debug("Running %s #%d..", funcName, index)
-            startTime = time.perf_counter() \
-                if timeMeasureGlobal else time.thread_time()
+            startTime = time.perf_counter()
             func(*args, **kwargs)
-            endTime = time.perf_counter() \
-                if timeMeasureGlobal else time.thread_time()
-            logger.debug("Finishing %s #%d in %gs..",
+            endTime = time.perf_counter()
+            logger.debug("Finishing %s #%d in %gs.. (Global dt)",
                          funcName, index, endTime - startTime)
         dtDistribution[index] = endTime - startTime
 
@@ -256,6 +254,33 @@ def formatPathForLog(path: Path, maxDepth: int = 3) -> str:
         base = base.parent
     return ("" if base is base.parent else "...") + \
         str(path.relative_to(base))
+
+
+def limitSubprocessResource(TL: float, ML: float) \
+        -> typing.Callable[..., None]:
+    """
+    Return function which limits current process's
+    soft time limit and soft memory limit.
+    All errors will be dropped.
+    """
+    def func():
+
+        # Getting limits
+        import resource
+        _, hardTL = resource.getrlimit(resource.RLIMIT_CPU)
+        _, hardML = resource.getrlimit(resource.RLIMIT_AS)
+
+        # Setting CPU time limit
+        resource.setrlimit(
+            resource.RLIMIT_CPU,
+            (max(1, round(TL)), hardTL))
+
+        # Setting total memory amount
+        resource.setrlimit(
+            resource.RLIMIT_AS,
+            (round(ML * 1024 ** 2), hardML))
+
+    return func
 
 
 if __name__ == "__main__":

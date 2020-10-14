@@ -11,6 +11,7 @@ import os
 from sys import float_info
 import typing
 from pathlib import Path
+import signal
 
 
 # Azad Library Version
@@ -268,12 +269,13 @@ class ExitCode(Enum):
     Success = 0  # Success
     GeneralUnintendedFail = 1  # Catchall for general errors
     InputParsingError = 3  # Failed to parse input
-    MLE = 4  # Memory Limit Exceeded
+    MLE = -signal.SIGSEGV.value  # Memory Limit Exceeded / SIGSEGV
     WrongTypeGenerated = 5  # Result variable type is wrong
     ValidatorFailed = 6  # Validation function failed
     SolutionFailed = 7  # Solution function failed (Verdict FAIL)
     GeneratorFailed = 8  # Generator function failed
-    TLE = 9  # Time Limit Exceeded
+    TLE = -signal.SIGXCPU.value  # Time Limit Exceeded / SIGXCPU
+    Killed = -signal.SIGKILL.value  # Killed by signal
 
 
 class SourceFileType(Enum):

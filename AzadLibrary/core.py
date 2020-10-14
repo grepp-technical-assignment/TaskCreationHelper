@@ -198,7 +198,7 @@ class AzadCore:
         timeDiff, _ = runThreads(
             run, self.concurrencyCount,
             *[((i,), {}) for i in range(len(self.config.genscripts))],
-            funcName="Generation", timeMeasureGlobal=True)
+            funcName="Generation")
         logger.info("Finished all generation in %g seconds.", timeDiff)
 
         # Check if there is any failure
@@ -257,7 +257,7 @@ class AzadCore:
         timeDiff, _ = runThreads(
             run, self.concurrencyCount,
             *[((i,), {}) for i in range(len(inputFiles))],
-            funcName="Validation", timeMeasureGlobal=True)
+            funcName="Validation")
         logger.info("Finished all validation in %g seconds.", timeDiff)
 
         # Check if there is any failure
@@ -306,14 +306,15 @@ class AzadCore:
             Use this under multithreading.
             """
             result[index] = module.run(
-                inputFiles[index], timelimit=self.config.TL)
+                inputFiles[index],
+                timelimit=self.config.TL,
+                memorylimit=self.config.ML)
 
         # Do multithreading
         timeDiff, _ = runThreads(
             run, self.concurrencyCount,
             *[((i,), {}) for i in range(len(inputFiles))],
-            funcName="Solution '%s'" % (solutionName,),
-            timeMeasureGlobal=True)
+            funcName="Solution '%s'" % (solutionName,))
         logger.info("Finished all solution '%s' process in %g seconds.",
                     solutionName, timeDiff)
 

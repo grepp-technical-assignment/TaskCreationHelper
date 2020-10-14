@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 # Azad libraries
 from .. import constants as Const
 from ..filesystem import TempFileSystem
-from ..misc import isExistingFile
+from ..misc import isExistingFile, limitSubprocessResource
 from ..errors import AzadError
 
 
@@ -143,6 +143,7 @@ class AbstractExternalModule:
     def invoke(
             args: Const.ArgType, stdin: Path = None, stderr: Path = None,
             timelimit: float = Const.DefaultTimeLimit,
+            memorylimit: float = Const.DefaultMemoryLimit,
             cwd: Path = None) -> Const.ExitCode:
         """
         Invoke given args with given stdin, stderr, timelimit and cwd.
@@ -164,18 +165,21 @@ class AbstractExternalModule:
 
         # Execute
         try:
-            subprocess = Popen(
+            P = Popen(
                 args, stdin=stdin, stdout=DEVNULL, stderr=stderr,
-                cwd=cwd, encoding='utf-8')
-            exitcode = subprocess.wait(timelimit)
+                cwd=cwd, encoding='ascii',
+                preexec_fn=limitSubprocessResource(timelimit, memorylimit))
+            exitcode = P.wait(60)  # One minute for max
             for ec in Const.ExitCode:
-                if ec.value == exitcode:
+                if ec.value == exitcode or ec.value + 256 == exitcode:
                     result = ec
                     break
-        except TimeoutExpired:  # TLE
-            result = Const.ExitCode.TLE
-            subprocess.kill()
+        except TimeoutExpired:  # Something went wrong.
+            result = Const.ExitCode.Killed
+            P.kill()
         finally:  # Close file objects
+            logger.debug("Executed \"%s\" with TL = %ds, ML = %gMB",
+                         P.args, timelimit, memorylimit)
             if stdin != DEVNULL:
                 stdin.close()
             if stderr != DEVNULL:
@@ -249,7 +253,7 @@ class AbstractExternalGenerator(AbstractExternalModule):
             self.executable if self.executable else self.modulePath)
         errorLog = self.fs.newTempFile(extension="log", namePrefix="err")
         exitcode = self.invoke(args, stderr=errorLog,
-                               timelimit=Const.DefaultGeneratorTL)
+                               timelimit=Const.DefaultGeneratorTL, **kwargs)
         return (exitcode, outfilePath, errorLog)
 
 
@@ -287,7 +291,7 @@ class AbstractExternalValidator(AbstractExternalModule):
             self.executable if self.executable else self.modulePath)
         errorLog = self.fs.newTempFile(extension="log", namePrefix="err")
         exitcode = self.invoke(args, stdin=infile, stderr=errorLog,
-                               timelimit=Const.DefaultValidatorTL)
+                               timelimit=Const.DefaultValidatorTL, **kwargs)
         return (exitcode, None, errorLog)
 
 
@@ -313,9 +317,7 @@ class AbstractExternalSolution(AbstractExternalModule):
         """
         raise NotImplementedError
 
-    def run(self, infile: Path, *args,
-            timelimit: float = Const.DefaultTimeLimit,
-            **kwargs) -> Const.EXOO:
+    def run(self, infile: Path, *args, **kwargs) -> Const.EXOO:
         """
         Run solution with given inflie path.
         Return exit code of solution process and file path
@@ -327,6 +329,5 @@ class AbstractExternalSolution(AbstractExternalModule):
         args = self.generateExecutionArgs(
             outfilePath, self.executable if self.executable else self.modulePath)
         errorLog = self.fs.newTempFile(extension="log", namePrefix="err")
-        exitcode = self.invoke(
-            args, stdin=infile, stderr=errorLog, timelimit=timelimit)
+        exitcode = self.invoke(args, stdin=infile, stderr=errorLog, **kwargs)
         return (exitcode, outfilePath, errorLog)

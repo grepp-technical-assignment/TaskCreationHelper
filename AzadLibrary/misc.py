@@ -190,22 +190,50 @@ def removeExtension(path: typing.Union[str, Path]) -> str:
         return path.name[:-(len(extension) + 1)]
 
 
-def runThreads(func: typing.Callable[..., typing.Any],
-               *argss: typing.Tuple[tuple, ...],
-               timeout: float = None) -> float:
+def runThreads(
+    func: typing.Callable[..., typing.Any],
+    concurrencyLimit: int,
+    *argss: typing.Tuple[tuple, ...],
+    timeout: float = None,
+    funcName: str = "unknown",
+    timeMeasureGlobal: bool = False) \
+        -> typing.Tuple[float, typing.List[float]]:
     """
     Run multiple threads on same function but different arguments.
-    Return total time used to execute all threads.
+    If `timeMeasureGlobal` is True, use `time.perf_counter` instead.
     """
+
+    # Semaphore and execution time measure
+    semaphore = threading.BoundedSemaphore(concurrencyLimit)
+    dtDistribution = [None for _ in range(len(argss))]
+
+    def tempFunc(index, *args, **kwargs):
+        """
+        Temporary function which runs given function,
+        but with several additional functionalities.
+        """
+        with semaphore:
+            logger.debug("Running %s #%d..", funcName, index)
+            startTime = time.perf_counter() \
+                if timeMeasureGlobal else time.thread_time()
+            func(*args, **kwargs)
+            endTime = time.perf_counter() \
+                if timeMeasureGlobal else time.thread_time()
+            logger.debug("Finishing %s #%d in %gs..",
+                         funcName, index, endTime - startTime)
+        dtDistribution[index] = endTime - startTime
+
+    # Make, run, and join threads
     threads = [threading.Thread(
-        target=func, args=args, kwargs=kwargs) for (args, kwargs) in argss]
+        target=tempFunc, args=(i,) + args, kwargs=kwargs)
+        for (i, (args, kwargs)) in zip(range(len(argss)), argss)]
     startTime = time.perf_counter()
     for thread in threads:
         thread.start()
     for thread in threads:
         thread.join(timeout=timeout)
     endTime = time.perf_counter()
-    return endTime - startTime
+    return (endTime - startTime, dtDistribution)
 
 
 def pause(condition: str = "Q"):

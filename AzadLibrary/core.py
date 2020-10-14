@@ -7,12 +7,10 @@ import json
 import os
 from pathlib import Path
 import typing
-import time
 import atexit
 import gc
 import logging
 import warnings
-import threading
 
 logger = logging.getLogger(__name__)
 
@@ -183,30 +181,25 @@ class AzadCore:
         logger.info("Generating input data..")
 
         # Prepare stuffs
-        semaphore = threading.BoundedSemaphore(self.concurrencyCount)
         results: typing.List[Const.EXOO] = \
             [(None, None, None) for _ in self.config.genscripts]
 
         def run(index: int):
             """
             Helper function to run independent generator subprocess.
-            Use this under multithreading.
+            Use this under `misc.runThreads`.
             """
-            with semaphore:
-                logger.debug("Starting generation #%d..", index + 1)
-                generatorName = self.config.genscripts[index][0]
-                genscript = self.config.genscripts[index][1:]
-                module = self.generatorModules[generatorName]
-                startTime = time.perf_counter()
-                results[index] = module.run(genscript)
-                endTime = time.perf_counter()
-                logger.debug("Finishing generation #%d in %gs..",
-                             index + 1, endTime - startTime)
+            generatorName = self.config.genscripts[index][0]
+            genscript = self.config.genscripts[index][1:]
+            module = self.generatorModules[generatorName]
+            results[index] = module.run(genscript)
 
         # Do multiprocessing
-        timeDiff = runThreads(
-            run, *[((i,), {}) for i in range(len(self.config.genscripts))])
-        logger.info("Finished all generator process in %g seconds.", timeDiff)
+        timeDiff, _ = runThreads(
+            run, self.concurrencyCount,
+            *[((i,), {}) for i in range(len(self.config.genscripts))],
+            funcName="Generation", timeMeasureGlobal=True)
+        logger.info("Finished all generation in %g seconds.", timeDiff)
 
         # Check if there is any failure
         failedIndices = []
@@ -250,7 +243,6 @@ class AzadCore:
 
         # Prepare stuffs
         logger.info("Validating input..")
-        semaphore = threading.BoundedSemaphore(self.concurrencyCount)
         results: typing.List[Const.EXOO] = \
             [(None, None, None) for _ in inputFiles]
 
@@ -259,18 +251,14 @@ class AzadCore:
             Helper function to run independent validator subprocess.
             Use this under multithreading.
             """
-            with semaphore:
-                logger.debug("Starting validation #%d..", index + 1)
-                startTime = time.perf_counter()
-                results[index] = self.validatorModule.run(inputFiles[index])
-                endTime = time.perf_counter()
-                logger.debug("Finishing validation #%d in %gs..",
-                             index + 1, endTime - startTime)
+            results[index] = self.validatorModule.run(inputFiles[index])
 
         # Do multithreading
-        timeDiff = runThreads(
-            run, *[((i,), {}) for i in range(len(inputFiles))])
-        logger.info("Finished all validation process in %g seconds", timeDiff)
+        timeDiff, _ = runThreads(
+            run, self.concurrencyCount,
+            *[((i,), {}) for i in range(len(inputFiles))],
+            funcName="Validation", timeMeasureGlobal=True)
+        logger.info("Finished all validation in %g seconds.", timeDiff)
 
         # Check if there is any failure
         failedIndices = []
@@ -311,26 +299,21 @@ class AzadCore:
         logger.info("Starting solution '%s'..", solutionName)
         result: typing.List[Const.EXOO] = \
             [(None, None, None) for _ in inputFiles]
-        semaphore = threading.BoundedSemaphore(self.concurrencyCount)
 
         def run(index: int):
             """
             Helper function to run independent validator subprocess.
             Use this under multithreading.
             """
-            with semaphore:
-                logger.debug("Starting solution '%s' #%d..",
-                             solutionName, index + 1)
-                startTime = time.perf_counter()
-                result[index] = module.run(
-                    inputFiles[index], timelimit=self.config.TL)
-                endTime = time.perf_counter()
-                logger.debug("Finishing solution '%s' #%d in %gs..",
-                             solutionName, index + 1, endTime - startTime)
+            result[index] = module.run(
+                inputFiles[index], timelimit=self.config.TL)
 
         # Do multithreading
-        timeDiff = runThreads(
-            run, *[((i,), {}) for i in range(len(inputFiles))])
+        timeDiff, _ = runThreads(
+            run, self.concurrencyCount,
+            *[((i,), {}) for i in range(len(inputFiles))],
+            funcName="Solution '%s'" % (solutionName,),
+            timeMeasureGlobal=True)
         logger.info("Finished all solution '%s' process in %g seconds.",
                     solutionName, timeDiff)
 

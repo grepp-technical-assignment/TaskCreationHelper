@@ -14,7 +14,7 @@ from pathlib import Path
 
 
 # Azad Library Version
-AzadLibraryVersion = "0.5.0"
+AzadLibraryVersion = "0.5.1"
 
 # Extra constraints
 MinimumPythonVersion = (3, 8, 3)

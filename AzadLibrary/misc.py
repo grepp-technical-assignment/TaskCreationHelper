@@ -140,17 +140,18 @@ def setupLoggers(mainLogFilePath: Path, replaceOldHandlers: bool,
     rootLogger.setLevel(logging.NOTSET)
 
 
-def getAvailableCPUCount() -> typing.Union[int, None]:
+def getAvailableTasksCount() -> int:
     """
     Get available CPU count for this process.
     If it's not available(like FreeBSD etc),
     then try to find physical number of CPUs.
-    If physical number of CPUs is undeterminable, return None instead.
+    If physical number of CPUs is undeterminable, return 1 instead.
     """
     try:
-        return len(os.sched_getaffinity(0))
+        return max(len(os.sched_getaffinity(0)), 1)
     except AttributeError:
-        return os.cpu_count()
+        count = os.cpu_count()
+        return 1 if count is None else max(count // 2, 1)
 
 
 def isExistingFile(path: Path) -> bool:

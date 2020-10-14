@@ -23,7 +23,7 @@ from . import (
     iodata as IOData,
 )
 from .misc import (
-    validateVerdict, getAvailableCPUCount,
+    validateVerdict, getAvailableTasksCount,
     getExtension, runThreads, pause, formatPathForLog)
 from .filesystem import TempFileSystem
 from .configparse import TaskConfiguration
@@ -55,10 +55,9 @@ class AzadCore:
                     formatPathForLog(Path(os.getcwd())))
 
         # Upper bound of number of threads
-        CPUcount = getAvailableCPUCount()
-        self.threadUpperBound: int = CPUcount if CPUcount is not None else 1
-        logger.info("Total %s processor cores are available.",
-                    CPUcount if CPUcount else "unknown")
+        self.concurrencyCount = getAvailableTasksCount()
+        logger.info("Total %d concurrent tasks will run.",
+                    self.concurrencyCount)
 
         # Replace precision equality function
         _iovt_precision_eq = (
@@ -184,7 +183,7 @@ class AzadCore:
         logger.info("Generating input data..")
 
         # Prepare stuffs
-        semaphore = threading.BoundedSemaphore(self.threadUpperBound)
+        semaphore = threading.BoundedSemaphore(self.concurrencyCount)
         results: typing.List[Const.EXOO] = \
             [(None, None, None) for _ in self.config.genscripts]
 
@@ -251,7 +250,7 @@ class AzadCore:
 
         # Prepare stuffs
         logger.info("Validating input..")
-        semaphore = threading.BoundedSemaphore(self.threadUpperBound)
+        semaphore = threading.BoundedSemaphore(self.concurrencyCount)
         results: typing.List[Const.EXOO] = \
             [(None, None, None) for _ in inputFiles]
 
@@ -312,7 +311,7 @@ class AzadCore:
         logger.info("Starting solution '%s'..", solutionName)
         result: typing.List[Const.EXOO] = \
             [(None, None, None) for _ in inputFiles]
-        semaphore = threading.BoundedSemaphore(self.threadUpperBound)
+        semaphore = threading.BoundedSemaphore(self.concurrencyCount)
 
         def run(index: int):
             """

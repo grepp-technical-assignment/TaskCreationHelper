@@ -29,7 +29,7 @@ def main(*argv):
         exit($ExitCodeGeneratorFailed)
     
     # Print out
-    with open(Path(argv[1]), "w", encoding = "ascii") as outfile:
+    with open(Path(argv[1]), "wb") as outfile:
         try:
             $PrintParameters
         except KeyError as err:

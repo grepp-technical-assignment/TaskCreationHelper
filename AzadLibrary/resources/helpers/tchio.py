@@ -1,5 +1,5 @@
 import typing
-from sys import stdout, stderr
+from sys import stderr
 from decimal import Decimal
 from fractions import Fraction
 import traceback
@@ -45,33 +45,45 @@ def parseMulti(lines: typing.Iterator[str], targetType: type, dimension: int):
                 for _ in range(size)]
 
 
-def printData(value: typing.Union[int, float, bool, str],
-              targetType: type, dimension: int,
-              file: typing.IO = stdout):
+def yieldStrized(value: typing.Union[int, float, bool, str],
+                 targetType: type, dimension: int) -> typing.Iterator[str]:
     """
-    Output given value into output file.
+    Yield each part of strized data from
+    given value and target type/dimension.
     """
     if dimension > 0:
-        assert isinstance(value, list)
-        print(len(value), file=file)
+        assert isinstance(value, (list, tuple))
+        yield str(len(value))
         for element in value:
-            printData(element, targetType, dimension - 1, file=file)
+            yield from yieldStrized(element, targetType, dimension - 1)
     elif targetType is int:
         assert isinstance(value, int)
-        print(value, file=file)
+        yield str(value)
     elif targetType is float:
         assert isinstance(value, (float, Decimal, Fraction))
-        print("%.20g" % (value,), file=file)
+        yield "%.20g" % (value,)
     elif targetType is bool:
         assert isinstance(value, bool)
-        print("true" if value else "false", file=file)
+        yield "true" if value else "false"
     elif targetType is str:
         assert isinstance(value, str)
-        print(len(value), file=file)
-        for ch in value:
-            print(ord(ch), file=file)
+        yield str(len(value))
+        yield from (str(ord(ch)) for ch in value)
     else:
         raise TypeError
+
+
+def printData(value: typing.Union[int, float, bool, str],
+              targetType: type, dimension: int,
+              file: typing.IO):
+    """
+    Output given value into output file.
+    Assume given file is opened in binary mode.
+    """
+    file.write(b'\n'.join(
+        c.encode('ascii') for c in
+        yieldStrized(value, targetType, dimension)))
+    file.write(b'\n')
 
 
 def printException(err: Exception, file: typing.IO = stderr):

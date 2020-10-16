@@ -1,9 +1,9 @@
 #ifndef __TCH_VAL_HEADER
 #define __TCH_VAL_HEADER
 
+#include "tchformat.hpp"
 #include <string>
 #include <stdexcept>
-#include "tchio.hpp"
 
 // Disable default assertion
 #ifdef assert

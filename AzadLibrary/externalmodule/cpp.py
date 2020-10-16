@@ -136,9 +136,10 @@ class AbstractCpp(AbstractProgrammingLanguage):
             cls, variableName: int,
             parameterType: Const.IOVariableTypes,
             parameterDimension: int) -> str:
-        return "%s = TCH::get%dd<%s>(std::cin);" % \
-            (cls.vnameByPname(variableName), parameterDimension,
-             cls.typeStrTable[parameterType][0])
+        return "%s = TCH::Data<%s, %d>::get(std::cin);" % \
+            (cls.vnameByPname(variableName),
+             cls.typeStrTable[parameterType][0],
+             parameterDimension)
 
     @classmethod
     def generateCodePutParameter(
@@ -148,9 +149,9 @@ class AbstractCpp(AbstractProgrammingLanguage):
         """
         Return statement `TCHIO.print(varName);`.
         """
-        return "TCH::put%dd<%s>(outfile, %s);" % \
-            (parameterDimension,
-             cls.typeStrTable[parameterType][0],
+        return "TCH::Data<%s, %d>::put(outfile, %s);" % \
+            (cls.typeStrTable[parameterType][0],
+             parameterDimension,
              cls.vnameByPname(variableName))
 
 

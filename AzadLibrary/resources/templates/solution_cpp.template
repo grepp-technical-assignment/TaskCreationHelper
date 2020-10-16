@@ -39,7 +39,7 @@ int main(int argc, char **argv){
     // Print out
     try{
         std::ofstream outfile(argv[1]);
-        TCH::put${ReturnDimension}d<$ReturnTypeBase>(outfile, result);
+        TCH::Data<$ReturnTypeBase, $ReturnDimension>::put(outfile, result);
     }
     catch(std::runtime_error err){
         std::cerr << "Failed to print result on solution"

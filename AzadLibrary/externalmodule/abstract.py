@@ -123,8 +123,8 @@ class AbstractExternalModule:
         self.parameterInfo = parameterInfo
         self.returnInfo = returnInfo
         self.prepared = False
-        self.modulePath: Const.OptionalPath = None
-        self.executable: Path = None
+        self.modulePath: Const.OptionalPath = None  # Execution Priority #2
+        self.executable: Const.OptionalPath = None  # Execution Priority #1
         self.name = name
 
     @classmethod

@@ -71,7 +71,7 @@ class AbstractProgrammingLanguage:
 
     @classmethod
     def generateCodeInitParameter(
-            cls, variableName: int,
+            cls, variableName: str,
             parameterType: Const.IOVariableTypes,
             parameterDimension: int) -> str:
         """
@@ -81,7 +81,7 @@ class AbstractProgrammingLanguage:
 
     @classmethod
     def generateCodeGetParameter(
-            cls, variableName: int,
+            cls, variableName: str,
             parameterType: Const.IOVariableTypes,
             parameterDimension: int) -> str:
         """
@@ -91,7 +91,7 @@ class AbstractProgrammingLanguage:
 
     @classmethod
     def generateCodePutParameter(
-            cls, variableName: int,
+            cls, variableName: str,
             parameterType: Const.IOVariableTypes,
             parameterDimension: int) -> str:
         """

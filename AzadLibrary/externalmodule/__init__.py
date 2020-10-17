@@ -16,7 +16,8 @@ from .python3 import (
     AbstractPython3, Python3Generator, Python3Validator, Python3Solution
 )
 from .cpp import (
-    AbstractCpp, CppGenerator, CppSolution, CppValidator
+    AbstractCpp, CppGenerator, CppSolution, CppValidator,
+    AbstractC, CSolution
 )
 
 _classes = {
@@ -29,6 +30,9 @@ _classes = {
         Const.SourceFileType.Generator: CppGenerator,
         Const.SourceFileType.Validator: CppValidator,
         Const.SourceFileType.Solution: CppSolution,
+    },
+    Const.SourceFileLanguage.C: {
+        Const.SourceFileType.Solution: CSolution,
     }
 }
 
@@ -40,5 +44,5 @@ def getExternalModuleClass(
         return _classes[lang][sourceType]
     except (KeyError, IndexError) as err:
         raise AzadError(
-            "Unsupported Lang %s / Type %s" %
+            "Unsupported (Lang %s, Type %s) pair." %
             (lang.name, sourceType.name)).with_traceback(err.__traceback__)

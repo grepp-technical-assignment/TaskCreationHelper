@@ -93,7 +93,7 @@ class AbstractPython3(AbstractProgrammingLanguage):
 
     @classmethod
     def generateCodeGetParameter(
-            cls, variableName: int,
+            cls, variableName: str,
             parameterType: Const.IOVariableTypes,
             parameterDimension: int) -> str:
         tReal = cls.typeStr(parameterType, 0)
@@ -103,7 +103,7 @@ class AbstractPython3(AbstractProgrammingLanguage):
 
     @classmethod
     def generateCodePutParameter(
-            cls, variableName: int,
+            cls, variableName: str,
             parameterType: Const.IOVariableTypes,
             parameterDimension: int) -> str:
         tReal = cls.typeStr(parameterType, 0)

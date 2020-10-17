@@ -1,0 +1,87 @@
+/*
+    Even though target solution is written in C,
+    we just call that function from C++ for convenience.
+*/
+
+// TCH Helper
+#include "tchio.hpp"
+
+// Solution module
+#include "$SolutionHeaderPath"
+
+// Standard libraries
+#include <iostream>
+#include <fstream>
+#include <vector>
+#include <string>
+#include <stdexcept>
+
+// Solution function
+extern "C" $ReturnType solution($ParameterArgs);
+
+// Main function
+int main(int argc, char **argv){
+
+    // Get input and parse
+    $InitCppParameters;
+    try{
+        $GetParameters;
+    }
+    catch(std::runtime_error err){
+        std::cerr << "Failed to parsing parameters on solution: "
+            << err.what() << std::endl;
+        return $ExitCodeInputParsingError;
+    }
+
+    // Convert Cpp params to C params
+    $InitCParameters;
+    try{
+        $ConvertParametersCppC;
+    }
+    catch(std::exception err){
+        std::cerr << "Failed to convert parameters C++ -> C: "
+            << err.what() << std::endl;
+        return $ExitCodeSolutionFailed;
+    }
+
+    // Execution
+    $ReturnType result;
+    try{
+        result = solution($SendParameters);
+    }
+    catch(std::exception err){
+        std::cerr << "Solution function failed: "
+            << err.what() << std::endl;
+        $FreeCParameters;
+        return $ExitCodeSolutionFailed
+    }
+    $FreeCParameters;
+
+    // Convert C result to Cpp result
+    $ReturnCppType resultCpp;
+    try{
+        resultCpp = TCH::Data<$ReturnTypeBaseCpp, 
+            $ReturnDimension>::convert_c_cpp(result);
+    }
+    catch(std::exception err){
+        std::cerr << "Failed to convert parameters C++ -> C: "
+            << err.what() << std::endl;
+        return $ExitCodeSolutionFailed;
+    }
+    TCH::Data<$ReturnTypeBaseCpp, $ReturnDimension>::superfree(result);
+
+    // Print out
+    try{
+        std::ofstream outfile(argv[1]);
+        TCH::Data<$ReturnTypeBaseCpp, 
+            $ReturnDimension>::put(outfile, resultCpp);
+    }
+    catch(std::exception err){
+        std::cerr << "Failed to print result on solution"
+            << err.what() << std::endl;
+        return $ExitCodeWrongTypeGenerated;
+    }
+
+    // Success
+    return $ExitCodeSuccess;
+}

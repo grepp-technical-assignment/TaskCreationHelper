@@ -9,6 +9,7 @@ import warnings
 import logging
 import atexit
 import argparse
+import traceback
 
 # Main Execution
 if __name__ == "__main__":
@@ -108,15 +109,19 @@ if __name__ == "__main__":
             "produce": Const.AzadLibraryMode.Produce,
             "generate": Const.AzadLibraryMode.GenerateCode,
         }[parsedResult.level]
+        logger = logging.getLogger(__name__)
 
-        # On exception, pause or not?
-        if parsedResult.pause_on_err:
-            try:
-                Core.run(mode)
-            except BaseException:
-                pause()
-        else:
+        try:
             Core.run(mode)
+        except BaseException as err:
+            if parsedResult.pause_on_err:
+                pause()
+            logger.error("\n" + "".join(traceback.format_exception(
+                type(err), err, err.__traceback__)))
+            logger.error("TCH FAILED. Please look at log.")
+            exit(1)
+        else:
+            logger.info("TCH SUCCEEDED!")
 
     else:
         raise ValueError(

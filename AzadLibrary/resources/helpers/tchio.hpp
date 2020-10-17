@@ -140,10 +140,14 @@ namespace TCH{
 
         // Convert C array into C++ data structure.
         inline static thisCppType convert_c_cpp(const thisCType &data){
+            throw std::runtime_error(
+                "C -> Cpp conversion for general array is not supported yet.");
+            /*
             thisCppType vec;
             for(size_t i=0; data[i] != NULL; i++)
                 vec.push_back(Data<t, dimension-1>::convert_c_cpp(data[i]));
             return vec;
+            */
         }
 
         // Free C pointer.

@@ -6,9 +6,6 @@
 // TCH Helper
 #include "tchio.hpp"
 
-// Solution module
-#include "$SolutionHeaderPath"
-
 // Standard libraries
 #include <iostream>
 #include <fstream>
@@ -17,7 +14,7 @@
 #include <stdexcept>
 
 // Solution function
-extern "C" $ReturnType solution($ParameterArgs);
+extern "C" $ReturnCType solution($ParameterArgs);
 
 // Main function
 int main(int argc, char **argv){
@@ -25,9 +22,9 @@ int main(int argc, char **argv){
     // Get input and parse
     $InitCppParameters;
     try{
-        $GetParameters;
+        $GetCppParameters;
     }
-    catch(std::runtime_error err){
+    catch(const std::exception &err){
         std::cerr << "Failed to parsing parameters on solution: "
             << err.what() << std::endl;
         return $ExitCodeInputParsingError;
@@ -38,22 +35,22 @@ int main(int argc, char **argv){
     try{
         $ConvertParametersCppC;
     }
-    catch(std::exception err){
+    catch(const std::exception &err){
         std::cerr << "Failed to convert parameters C++ -> C: "
             << err.what() << std::endl;
         return $ExitCodeSolutionFailed;
     }
 
     // Execution
-    $ReturnType result;
+    $ReturnCType result;
     try{
         result = solution($SendParameters);
     }
-    catch(std::exception err){
+    catch(const std::exception &err){
         std::cerr << "Solution function failed: "
             << err.what() << std::endl;
         $FreeCParameters;
-        return $ExitCodeSolutionFailed
+        return $ExitCodeSolutionFailed;
     }
     $FreeCParameters;
 
@@ -63,9 +60,10 @@ int main(int argc, char **argv){
         resultCpp = TCH::Data<$ReturnTypeBaseCpp, 
             $ReturnDimension>::convert_c_cpp(result);
     }
-    catch(std::exception err){
+    catch(const std::exception &err){
         std::cerr << "Failed to convert parameters C++ -> C: "
             << err.what() << std::endl;
+        TCH::Data<$ReturnTypeBaseCpp, $ReturnDimension>::superfree(result);
         return $ExitCodeSolutionFailed;
     }
     TCH::Data<$ReturnTypeBaseCpp, $ReturnDimension>::superfree(result);
@@ -76,7 +74,7 @@ int main(int argc, char **argv){
         TCH::Data<$ReturnTypeBaseCpp, 
             $ReturnDimension>::put(outfile, resultCpp);
     }
-    catch(std::exception err){
+    catch(const std::exception &err){
         std::cerr << "Failed to print result on solution"
             << err.what() << std::endl;
         return $ExitCodeWrongTypeGenerated;

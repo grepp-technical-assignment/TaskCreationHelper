@@ -18,7 +18,7 @@ int main(int argc, char **argv){
     try{
         $GetParameters;
     }
-    catch(std::exception err){
+    catch(const std::exception &err){
         std::cerr << "Failed to parsing parameters on solution: "
             << err.what() << std::endl;
         return $ExitCodeInputParsingError;
@@ -28,7 +28,7 @@ int main(int argc, char **argv){
     try{
         validate($SendParameters);
     }
-    catch(std::exception err){
+    catch(const std::exception &err){
         std::cerr << "Validation failed: "
             << err.what() << std::endl;
         return $ExitCodeValidatorFailed;

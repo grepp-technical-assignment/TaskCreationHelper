@@ -2,15 +2,15 @@
 #include "tchio.hpp"
 #include "tchrand.hpp"
 
-// Generator module
-#include "$GeneratorHeaderPath"
-
 // Standard libraries
 #include <iostream>
 #include <fstream>
 #include <vector>
 #include <string>
 #include <stdexcept>
+
+// Generate function
+void generate(std::vector<std::string> genscript, $ParameterArgsRef);
 
 // Main function
 int main(int argc, char **argv){

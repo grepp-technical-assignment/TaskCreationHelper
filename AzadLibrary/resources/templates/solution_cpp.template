@@ -1,15 +1,15 @@
 // TCH Helper
 #include "tchio.hpp"
 
-// Solution module
-#include "$SolutionHeaderPath"
-
 // Standard libraries
 #include <iostream>
 #include <fstream>
 #include <vector>
 #include <string>
 #include <stdexcept>
+
+// Solution function
+$ReturnType solution($ParameterArgs);
 
 // Main function
 int main(int argc, char **argv){

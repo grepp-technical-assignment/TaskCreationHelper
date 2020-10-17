@@ -44,12 +44,6 @@ class AbstractCpp(AbstractProgrammingLanguage):
         "templates/solution_cpp.template"
     validatorTemplatePath = Const.ResourcesPath / \
         "templates/validator_cpp.template"
-    generatorHeaderTemplatePath = Const.ResourcesPath / \
-        "templates/generator_cpp_header.template"
-    solutionHeaderTemplatePath = Const.ResourcesPath / \
-        "templates/solution_cpp_header.template"
-    validatorHeaderTemplatePath = Const.ResourcesPath / \
-        "templates/validator_cpp_header.template"
     helperHeadersPath = Const.ResourcesPath / "helpers"
 
     # Indent level
@@ -64,9 +58,6 @@ class AbstractCpp(AbstractProgrammingLanguage):
     def templateDict(
             cls, *args, parameterInfo: typing.List[typing.Tuple[
                 str, Const.IOVariableTypes, int]] = (),
-            generatorHeaderPath: Path = None,
-            solutionHeaderPath: Path = None,
-            validatorHeaderPath: Path = None,
             returnInfo: Const.ReturnInfoType = None,
             **kwargs) -> dict:
 
@@ -101,19 +92,6 @@ class AbstractCpp(AbstractProgrammingLanguage):
             result["ReturnType"] = cls.typeStr(returnType, returnDimension)
             result["ReturnDimension"] = returnDimension
             result["ReturnTypeBase"] = cls.typeStr(returnType, 0)
-
-        def registerPath(key: str, path: Path):
-            if path:
-                if not isExistingFile(path):
-                    raise OSError(
-                        "Given path(key = %s, path = %s) isn't existing file" %
-                        (key, path))
-                result[key] = path.name  # Should not remove extension
-
-        # Set paths
-        registerPath("GeneratorHeaderPath", generatorHeaderPath)
-        registerPath("SolutionHeaderPath", solutionHeaderPath)
-        registerPath("ValidatorHeaderPath", validatorHeaderPath)
 
         # Return
         return result
@@ -173,30 +151,20 @@ class CppGenerator(AbstractExternalGenerator, AbstractCpp):
 
     @classmethod
     def generateCode(
-            cls, generatorPath: Path, parameterInfo: Const.ParamInfoList,
+            cls, parameterInfo: Const.ParamInfoList,
             *args, **kwargs) -> str:
         """
         Consider `generatorPath` as `generatorHeaderPath`.
         """
         return cls.replaceSymbols(
-            cls.generatorTemplatePath, cls.templateDict(
-                parameterInfo=parameterInfo,
-                generatorHeaderPath=generatorPath)
+            cls.generatorTemplatePath,
+            cls.templateDict(parameterInfo=parameterInfo)
         )
 
     def preparePipeline(self):
 
         # Prepare original stuffs
-        originalModuleHeaderCode = self.replaceSymbols(
-            self.generatorHeaderTemplatePath,
-            self.templateDict(parameterInfo=self.parameterInfo)
-        )
-        originalModuleHeaderPath = self.fs.newTempFile(
-            content=originalModuleHeaderCode,
-            filename=removeExtension(self.originalModulePath.name),
-            extension="hpp"
-        )
-        code = self.generateCode(originalModuleHeaderPath, self.parameterInfo)
+        code = self.generateCode(self.parameterInfo)
         self.modulePath = self.fs.newTempFile(
             content=code, extension="cpp", namePrefix="generator")
 
@@ -243,34 +211,23 @@ class CppValidator(AbstractExternalValidator, AbstractCpp):
 
     @classmethod
     def generateCode(
-            cls, validatorPath: Path, parameterInfo: Const.ParamInfoList,
+            cls, parameterInfo: Const.ParamInfoList,
             returnInfo: Const.ReturnInfoType,
             *args, **kwargs) -> str:
         """
         Consider `validatorPath` as `validatorHeaderPath`.
         """
         return cls.replaceSymbols(
-            cls.validatorTemplatePath, cls.templateDict(
+            cls.validatorTemplatePath,
+            cls.templateDict(
                 parameterInfo=parameterInfo,
-                validatorHeaderPath=validatorPath,
                 returnInfo=returnInfo)
         )
 
     def preparePipeline(self):
 
         # Prepare original stuffs
-        originalModuleHeaderCode = self.replaceSymbols(
-            self.validatorHeaderTemplatePath,
-            self.templateDict(parameterInfo=self.parameterInfo)
-        )
-        originalModuleHeaderPath = self.fs.newTempFile(
-            content=originalModuleHeaderCode,
-            filename=removeExtension(self.originalModulePath.name),
-            extension="hpp"
-        )
-        code = self.generateCode(
-            originalModuleHeaderPath,
-            self.parameterInfo, self.returnInfo)
+        code = self.generateCode(self.parameterInfo, self.returnInfo)
         self.modulePath = self.fs.newTempFile(
             content=code, extension="cpp", namePrefix="validator")
 
@@ -317,36 +274,23 @@ class CppSolution(AbstractExternalSolution, AbstractCpp):
 
     @classmethod
     def generateCode(
-            cls, solutionPath: Path, parameterInfo: Const.ParamInfoList,
+            cls, parameterInfo: Const.ParamInfoList,
             returnInfo: Const.ReturnInfoType,
             *args, **kwargs) -> str:
         """
         Consider `solutionPath` as `solutionHeaderPath`.
         """
         return cls.replaceSymbols(
-            cls.solutionTemplatePath, cls.templateDict(
+            cls.solutionTemplatePath,
+            cls.templateDict(
                 parameterInfo=parameterInfo,
-                solutionHeaderPath=solutionPath,
                 returnInfo=returnInfo)
         )
 
     def preparePipeline(self):
 
         # Prepare original stuffs
-        originalModuleHeaderCode = self.replaceSymbols(
-            self.solutionHeaderTemplatePath,
-            self.templateDict(
-                parameterInfo=self.parameterInfo,
-                returnInfo=self.returnInfo)
-        )
-        originalModuleHeaderPath = self.fs.newTempFile(
-            content=originalModuleHeaderCode,
-            filename=removeExtension(self.originalModulePath.name),
-            extension="hpp"
-        )
-        code = self.generateCode(
-            originalModuleHeaderPath,
-            self.parameterInfo, self.returnInfo)
+        code = self.generateCode(self.parameterInfo, self.returnInfo)
         self.modulePath = self.fs.newTempFile(
             content=code, extension="cpp", namePrefix="solution")
 
@@ -355,7 +299,7 @@ class CppSolution(AbstractExternalSolution, AbstractCpp):
             extension="exe", namePrefix="solution")
         compilationArgs = self.generateCompilationArgs(
             self.modulePath, self.executable,
-            self.originalModulePath, originalModuleHeaderPath)
+            self.originalModulePath)
         compilationErrorLog = self.fs.newTempFile(
             extension="log", namePrefix="err")
         compilationExitCode = self.invoke(

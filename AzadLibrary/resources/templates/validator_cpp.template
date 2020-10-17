@@ -1,14 +1,14 @@
 // TCH Helper
 #include "tchio.hpp"
 
-// Validator module
-#include "$ValidatorHeaderPath"
-
 // Standard libraries
 #include <iostream>
 #include <vector>
 #include <string>
 #include <stdexcept>
+
+// Validate function
+void validate($ParameterArgs);
 
 // Main function
 int main(int argc, char **argv){

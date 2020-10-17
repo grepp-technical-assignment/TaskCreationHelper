@@ -109,6 +109,8 @@ class AzadCore:
                          extension="py", namePrefix="helper")
 
         # Language specification for kwargs in getModule function
+        # The reason why I put this here instead of function interface is,
+        # because these values are dynamic(unpredictable).
         _kwargs_lang_specification = {
             Const.SourceFileLanguage.Python3: {
                 "ioHelperModulePath":

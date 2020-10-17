@@ -23,23 +23,19 @@ class AbstractCpp(AbstractProgrammingLanguage):
     C++ specification of abstract programming language.
     """
 
-    typeStrTable = {
-        Const.IOVariableTypes.INT: [
-            "int", "std::vector<int>", "std::vector<std::vector<int>>"],
-        Const.IOVariableTypes.LONG: [
-            "long long int", "std::vector<long long int>",
-            "std::vector<std::vector<long long int>>"],
-        Const.IOVariableTypes.FLOAT: [
-            "float", "std::vector<float>", "std::vector<std::vector<float>>"],
-        Const.IOVariableTypes.DOUBLE: [
-            "double", "std::vector<double>",
-            "std::vector<std::vector<double>>"],
-        Const.IOVariableTypes.BOOL: [
-            "bool", "std::vector<bool>", "std::vector<std::vector<bool>>"],
-        Const.IOVariableTypes.STRING: [
-            "std::string", "std::vector<std::string>",
-            "std::vector<std::vector<std::string>>"],
+    baseTypeStrTable = {
+        Const.IOVariableTypes.INT: "int",
+        Const.IOVariableTypes.LONG: "long long int",
+        Const.IOVariableTypes.FLOAT: "float",
+        Const.IOVariableTypes.DOUBLE: "double",
+        Const.IOVariableTypes.BOOL: "bool",
+        Const.IOVariableTypes.STRING: "std::string"
     }
+
+    @classmethod
+    def typeStr(cls, iovt: Const.IOVariableTypes, dimension: int):
+        return cls.baseTypeStrTable[iovt] if dimension == 0 else \
+            "std::vector<%s>" % cls.typeStr(iovt, dimension - 1)
 
     # Template file path
     generatorTemplatePath = Const.ResourcesPath / \
@@ -79,10 +75,10 @@ class AbstractCpp(AbstractProgrammingLanguage):
 
         # Parameter arguments (for all modules)
         result["ParameterArgs"] = ", ".join(
-            "%s %s" % (cls.typeStrTable[pType][dimension], pName)
+            "%s %s" % (cls.typeStr(pType, dimension), pName)
             for pName, pType, dimension in parameterInfo)
         result["ParameterArgsRef"] = ", ".join(
-            "%s &%s" % (cls.typeStrTable[pType][dimension], pName)
+            "%s &%s" % (cls.typeStr(pType, dimension), pName)
             for pName, pType, dimension in parameterInfo)
         result["SendParameters"] = ", ".join(
             cls.vnameByPname(pName) for pName, _1, _2 in parameterInfo)
@@ -102,9 +98,9 @@ class AbstractCpp(AbstractProgrammingLanguage):
         # Result info
         if returnInfo:
             returnType, returnDimension = returnInfo
-            result["ReturnType"] = cls.typeStrTable[returnType][returnDimension]
+            result["ReturnType"] = cls.typeStr(returnType, returnDimension)
             result["ReturnDimension"] = returnDimension
-            result["ReturnTypeBase"] = cls.typeStrTable[returnType][0]
+            result["ReturnTypeBase"] = cls.typeStr(returnType, 0)
 
         def registerPath(key: str, path: Path):
             if path:
@@ -128,7 +124,7 @@ class AbstractCpp(AbstractProgrammingLanguage):
             parameterType: Const.IOVariableTypes,
             parameterDimension: int) -> str:
         return "%s %s;" % \
-            (cls.typeStrTable[parameterType][parameterDimension],
+            (cls.typeStr(parameterType, parameterDimension),
              cls.vnameByPname(variableName))
 
     @classmethod
@@ -138,7 +134,7 @@ class AbstractCpp(AbstractProgrammingLanguage):
             parameterDimension: int) -> str:
         return "%s = TCH::Data<%s, %d>::get(std::cin);" % \
             (cls.vnameByPname(variableName),
-             cls.typeStrTable[parameterType][0],
+             cls.typeStr(parameterType, 0),
              parameterDimension)
 
     @classmethod
@@ -150,7 +146,7 @@ class AbstractCpp(AbstractProgrammingLanguage):
         Return statement `TCHIO.print(varName);`.
         """
         return "TCH::Data<%s, %d>::put(outfile, %s);" % \
-            (cls.typeStrTable[parameterType][0],
+            (cls.typeStr(parameterType, 0),
              parameterDimension,
              cls.vnameByPname(variableName))
 

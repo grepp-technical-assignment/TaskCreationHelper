@@ -33,7 +33,7 @@ def main(*argv):
     # Print out
     try:
         with open(Path(argv[1]), "wb") as outfile:
-            TCHIO.printData(result, $ReturnType, 
+            TCHIO.printData(result, $ReturnTypeBase, 
                 $ReturnDimension, file = outfile)
     except (TypeError, AssertionError, ValueError) as err:
         TCHIO.printException(err)

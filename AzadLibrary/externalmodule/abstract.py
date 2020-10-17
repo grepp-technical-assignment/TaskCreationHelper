@@ -27,8 +27,14 @@ class AbstractProgrammingLanguage:
     defaultIndentation = 4
 
     # typeStrTable[IOVT][dimension] is corresponding type in language.
-    typeStrTable = {_iovt: [NotImplemented for _ in range(3)]
-                    for _iovt in Const.IOVariableTypes}
+    baseTypeStrTable = {iovt: NotImplemented for iovt in Const.IOVariableTypes}
+
+    @classmethod
+    def typeStr(cls, iovt: Const.IOVariableTypes, dimension: int):
+        """
+        Return type string for given iovt and dimension.
+        """
+        raise NotImplementedError
 
     # Module template files; Should be overrided in child class.
     generatorTemplatePath = NotImplemented

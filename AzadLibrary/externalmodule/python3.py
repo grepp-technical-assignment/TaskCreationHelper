@@ -20,20 +20,19 @@ class AbstractPython3(AbstractProgrammingLanguage):
     Python3 specification of abstract programming language.
     """
 
-    typeStrTable = {
-        Const.IOVariableTypes.INT: [
-            "int", "typing.List[int]", "typing.List[typing.List[int]]"],
-        Const.IOVariableTypes.LONG: [
-            "int", "typing.List[int]", "typing.List[typing.List[int]]"],
-        Const.IOVariableTypes.FLOAT: [
-            "float", "typing.List[float]", "typing.List[typing.List[float]]"],
-        Const.IOVariableTypes.DOUBLE: [
-            "float", "typing.List[float]", "typing.List[typing.List[float]]"],
-        Const.IOVariableTypes.BOOL: [
-            "bool", "typing.List[bool]", "typing.List[typing.List[bool]]"],
-        Const.IOVariableTypes.STRING: [
-            "str", "typing.List[str]", "typing.List[typing.List[str]]"]
+    baseTypeStrTable = {
+        Const.IOVariableTypes.INT: "int",
+        Const.IOVariableTypes.LONG: "int",
+        Const.IOVariableTypes.FLOAT: "float",
+        Const.IOVariableTypes.DOUBLE: "float",
+        Const.IOVariableTypes.BOOL: "bool",
+        Const.IOVariableTypes.STRING: "str"
     }
+
+    @classmethod
+    def typeStr(cls, iovt: Const.IOVariableTypes, dimension: int):
+        return cls.baseTypeStrTable[iovt] if dimension == 0 else \
+            "typing.List[%s]" % cls.typeStr(iovt, dimension - 1)
 
     # Template file path
     generatorTemplatePath = Const.ResourcesPath / \
@@ -72,7 +71,7 @@ class AbstractPython3(AbstractProgrammingLanguage):
         # Result info
         if returnInfo:
             returnType, returnDimension = returnInfo
-            result["ReturnType"] = cls.typeStrTable[returnType][0]
+            result["ReturnTypeBase"] = cls.typeStr(returnType, 0)
             result["ReturnDimension"] = returnDimension
 
         def registerPath(key: str, path: Path):
@@ -97,8 +96,8 @@ class AbstractPython3(AbstractProgrammingLanguage):
             cls, variableName: int,
             parameterType: Const.IOVariableTypes,
             parameterDimension: int) -> str:
-        tReal = cls.typeStrTable[parameterType][0]
-        tHint = cls.typeStrTable[parameterType][parameterDimension]
+        tReal = cls.typeStr(parameterType, 0)
+        tHint = cls.typeStr(parameterType, parameterDimension)
         return "inputValues['%s']: %s = TCHIO.parseMulti(inputLineIterator, %s, %d)" % \
             (variableName, tHint, tReal, parameterDimension)
 
@@ -107,7 +106,7 @@ class AbstractPython3(AbstractProgrammingLanguage):
             cls, variableName: int,
             parameterType: Const.IOVariableTypes,
             parameterDimension: int) -> str:
-        tReal = cls.typeStrTable[parameterType][0]
+        tReal = cls.typeStr(parameterType, 0)
         return "TCHIO.printData(generated['%s'], %s, %s, file = outfile); del generated['%s']" % \
             (variableName, tReal, parameterDimension, variableName)
 

@@ -20,7 +20,7 @@ from .abstract import (
 
 def reportCompilationFailure(
         errLogPath: Path, modulePath: Path,
-        args: typing.List[str, Path],
+        args: typing.List[typing.Union[str, Path]],
         moduleType: Const.SourceFileType):
     """
     Report C/C++ compilation failure.

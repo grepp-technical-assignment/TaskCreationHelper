@@ -41,16 +41,6 @@ DefaultLogFileBackups = 5  # blabla.log.%d
 DefaultLogBaseFMT = "[%%(asctime)s][%%(levelname)-7s][%%(name)s][L%%(lineno)s] %%(message).%ds"
 DefaultLogDateFMT = "%Y/%m/%d %H:%M:%S"
 
-# Default typestring for all accepted types.
-DefaultTypeStrings = {
-    int: "int",
-    float: "float",
-    Decimal: "float",
-    Fraction: "float",
-    bool: "bool",
-    str: "str"
-}
-
 # Path to the resources folder
 ResourcesPath = Path(os.path.abspath(__file__)).parent / "resources"
 

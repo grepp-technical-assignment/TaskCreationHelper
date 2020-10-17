@@ -105,8 +105,13 @@ class AbstractExternalModule:
     Abstract base of all external modules.
     When you inherit and make new modules, please inherit like
     `class NewLanguage$Filetype($AbstractFiletype, $AbstractLang): ...`.
+
     Stream `stdout` is set to `DEVNULL` in subprocess
-    for all external modules and subprocesses for better performance.
+    for all external modules for better performance.
+
+    `originalModulePath` is NOT a real original module path here,
+    it's meant to be COPIED module's path. `self.executable` or
+    `self.modulePath` will be executed.
     """
 
     def __init__(self, originalModulePath: Path, fs: TempFileSystem,

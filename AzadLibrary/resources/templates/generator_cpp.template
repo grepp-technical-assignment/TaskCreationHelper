@@ -25,7 +25,7 @@ int main(int argc, char **argv){
     try{
         generate(genscript, $SendParameters);
     }
-    catch(std::runtime_error err){
+    catch(std::exception err){
         std::cerr << "Generate function failed: " 
             << err.what() << std::endl;
         return $ExitCodeGeneratorFailed;
@@ -36,7 +36,7 @@ int main(int argc, char **argv){
         std::ofstream outfile(argv[1]);
         $PrintParameters;
     }
-    catch(std::runtime_error err){
+    catch(std::exception err){
         std::cerr << "Failed to print parameters on generator: "
             << err.what() << std::endl;
         return $ExitCodeGeneratorFailed;

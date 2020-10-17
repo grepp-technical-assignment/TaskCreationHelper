@@ -342,8 +342,8 @@ class AbstractC(AbstractCpp):
         return cls.baseTypeStrTable[iovt] + "*" * dimension
 
     # Template file path
-    generatorTemplatePath = Const.ResourcesPath / \
-        "templates/generator_c.template"
+    solutionTemplatePath = Const.ResourcesPath / \
+        "templates/solution_c.template"
 
     # Indent level
     indentLevelParameterInit = 1
@@ -383,13 +383,13 @@ class AbstractC(AbstractCpp):
                 for param in parameterInfo)
 
         # Get all parameters (for validators and solutions)
-        result["GetParameters"] = cls.leveledNewline(
+        result["GetCppParameters"] = cls.leveledNewline(
             cls.indentLevelParameterGet).join(
-            cls.generateCodeGetParameter(*param)
+            AbstractCpp.generateCodeGetParameter(*param)
                 for param in parameterInfo)
 
         # Free parameters (for all modules)
-        result["FreeParameters"] = cls.leveledNewline(
+        result["FreeCParameters"] = cls.leveledNewline(
             cls.indentLevelParameterFree).join(
             cls.generateCodeFreeParameter(*param)
                 for param in parameterInfo)
@@ -403,9 +403,12 @@ class AbstractC(AbstractCpp):
         # Result info
         if returnInfo:
             returnType, returnDimension = returnInfo
-            result["ReturnType"] = cls.typeStr(returnType, returnDimension)
+            result["ReturnCppType"] = \
+                AbstractCpp.typeStr(returnType, returnDimension)
+            result["ReturnCType"] = cls.typeStr(returnType, returnDimension)
             result["ReturnDimension"] = returnDimension
             result["ReturnTypeBase"] = cls.typeStr(returnType, 0)
+            result["ReturnTypeBaseCpp"] = AbstractCpp.typeStr(returnType, 0)
 
         # Return
         return result
@@ -452,10 +455,10 @@ class AbstractC(AbstractCpp):
         nameC: str = cls.vnameByPname(variableName)
         nameCpp: str = super().vnameByPname(variableName)
         if fromCpp:  # C++ -> C
-            return "%s = %s::%s(%s);" % \
+            return "%s = %s::convert_%s(%s);" % \
                 (nameC, middle, "cpp_c", nameCpp)
         else:  # C -> C++
-            return "%s = %s::%s(%s);" % \
+            return "%s = %s::convert_%s(%s);" % \
                 (nameCpp, middle, "c_cpp", nameC)
 
 
@@ -492,7 +495,7 @@ class CSolution(AbstractExternalSolution, AbstractC):
         executableTempC = self.fs.newTempFile(
             extension="exe", namePrefix="solution")
         compilationArgs1 = [
-            "g++", "-c", self.originalModulePath,
+            "gcc", "-c", self.originalModulePath,
             "-std=c11", "-O2", "-Wall",
             "-I", self.helperHeadersPath,
             "-o", executableTempC]
@@ -549,6 +552,6 @@ class CSolution(AbstractExternalSolution, AbstractC):
                 compilationArgs3, Const.SourceFileType.Solution)
 
         # Clean useless binary files
-        self.fs.pop(executableTempC)
-        self.fs.pop(executableTempCpp)
+        self.fs.pop(executableTempC, b=True)
+        self.fs.pop(executableTempCpp, b=True)
         self.prepared = True

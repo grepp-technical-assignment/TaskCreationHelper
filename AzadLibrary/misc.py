@@ -14,7 +14,7 @@ import typing
 from pathlib import Path
 import threading
 import copy
-import resource
+import statistics
 
 logger = logging.getLogger(__name__)
 
@@ -281,6 +281,32 @@ def limitSubprocessResource(TL: float, ML: float) \
             (round(ML * 1024 ** 2), hardML))
 
     return func
+
+
+def reportSolutionStatistics(
+        verdicts: typing.List[Const.Verdict],
+        dtDistribution: typing.List[float],
+        quantilesCount: int = 4) -> None:
+    """
+    Report statistics based on verdicts and dt distribution.
+    """
+
+    # Brief report first
+    logger.info("Verdict brief: %s", " / ".join("%s %g%%" % (
+        verdict.name, 1e2 * verdicts.count(verdict) / len(verdicts))
+        for verdict in Const.Verdict)
+    )
+    if len(dtDistribution) > 1:
+        dtQuantiles = statistics.quantiles(dtDistribution, n=quantilesCount)
+        dtQuantiles = [min(dtDistribution)] + \
+            dtQuantiles + [max(dtDistribution)]
+        logger.info("DT brief (not precise): %s", " / ".join("Q%d %gs" % (
+            i, dtQuantiles[i]) for i in range(len(dtQuantiles))))
+
+    # Detail individuals
+    logger.debug("Verdicts: [%s]", ", ".join(v.name for v in verdicts))
+    logger.debug("DT distribution: [%s]", ", ".join(
+        "%gs" % (dt,) for dt in dtDistribution))
 
 
 if __name__ == "__main__":

@@ -22,7 +22,8 @@ from . import (
 )
 from .misc import (
     validateVerdict, getAvailableTasksCount,
-    getExtension, runThreads, pause, formatPathForLog)
+    getExtension, runThreads, pause,
+    formatPathForLog, reportSolutionStatistics)
 from .filesystem import TempFileSystem
 from .configparse import TaskConfiguration
 
@@ -349,13 +350,8 @@ class AzadCore:
                 verdict = Const.Verdict.MLE
             verdicts.append(verdict)
 
-        # Analyze verdicts
-        logger.debug("Verdicts: [%s]", ", ".join(
-            "%s" % (v.name,) if v is not Const.Verdict.FAIL
-            else "%s(%s)" % (v.name, r[0].name)
-            for v, r in zip(verdicts, result)))
-        logger.debug("DT: [%s]", ", ".join(
-            "%g" % dt for dt in dtDistribution))
+        # Report and analyze verdicts
+        reportSolutionStatistics(verdicts, dtDistribution)
         verdictCount = {verdict: verdicts.count(verdict)
                         for verdict in Const.Verdict}
 

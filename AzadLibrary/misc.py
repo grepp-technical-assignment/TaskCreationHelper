@@ -264,21 +264,18 @@ def limitSubprocessResource(TL: float, ML: float) \
     All errors will be dropped.
     """
     def func():
-
-        # Getting limits
         import resource
-        _, hardTL = resource.getrlimit(resource.RLIMIT_CPU)
-        _, hardML = resource.getrlimit(resource.RLIMIT_AS)
 
         # Setting CPU time limit
+        _, hardTL = resource.getrlimit(resource.RLIMIT_CPU)
         resource.setrlimit(
-            resource.RLIMIT_CPU,
-            (max(1, round(TL)), hardTL))
+            resource.RLIMIT_CPU, (max(1, round(TL)), hardTL))
 
         # Setting total memory amount
-        resource.setrlimit(
-            resource.RLIMIT_AS,
-            (round(ML * 1024 ** 2), hardML))
+        for rid in (resource.RLIMIT_AS, resource.RLIMIT_DATA,
+                    resource.RLIMIT_STACK):
+            _, hardML = resource.getrlimit(rid)
+            resource.setrlimit(rid, (round(ML * 1024 ** 2), hardML))
 
     return func
 

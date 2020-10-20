@@ -8,6 +8,7 @@ from pathlib import Path
 from subprocess import Popen, DEVNULL, TimeoutExpired
 from string import Template as StringTemplate
 import logging
+import threading
 
 logger = logging.getLogger(__name__)
 
@@ -150,6 +151,9 @@ class AbstractExternalModule:
             template = StringTemplate(sourceCodeFile.read())
         return template.substitute(mapping)
 
+    # Global semaphore for invocation
+    globalInvokeSemaphore = threading.BoundedSemaphore()
+
     @staticmethod
     def invoke(
             args: Const.ArgType, stdin: Path = None, stderr: Path = None,
@@ -176,10 +180,12 @@ class AbstractExternalModule:
 
         # Execute
         try:
-            P = Popen(
-                args, stdin=stdin, stdout=DEVNULL, stderr=stderr,
-                cwd=cwd, encoding='ascii',
-                preexec_fn=limitSubprocessResource(timelimit, memorylimit))
+            with AbstractExternalModule.globalInvokeSemaphore:
+                P = Popen(
+                    args, stdin=stdin, stdout=DEVNULL, stderr=stderr,
+                    cwd=cwd, encoding='ascii',
+                    preexec_fn=limitSubprocessResource(timelimit, memorylimit)
+                )
             exitcode = P.wait(60)  # One minute for max
             for ec in Const.ExitCode:
                 if ec.value == exitcode or ec.value + 256 == exitcode:
@@ -189,8 +195,8 @@ class AbstractExternalModule:
             result = Const.ExitCode.Killed
             P.kill()
         finally:  # Close file objects
-            logger.debug("Executed \"%s\" with TL = %ds, ML = %gMB",
-                         P.args, timelimit, memorylimit)
+            logger.debug("Executed \"%s\" with TL = %ds, ML = %gMB, exitcode = %d (%s)",
+                         P.args, timelimit, memorylimit, P.returncode, result.name)
             if stdin != DEVNULL:
                 stdin.close()
             if stderr != DEVNULL:

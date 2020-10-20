@@ -30,6 +30,7 @@
         "AC": ["solution.py", "solution.cpp", "solution.c"],
         "WA": ["wrong_answer.py", "wrong_answer.cpp"],
         "TLE": ["tle.py", "tle.cpp"],
+        "MLE": ["mle.cpp"],
         "FAIL": ["fail.py"]
     },
     "generators": {

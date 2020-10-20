@@ -46,6 +46,11 @@ int main(int argc, char **argv){
     try{
         result = solution($SendParameters);
     }
+    catch(const std::bad_alloc &e) {
+        std::cout << "Memory limit exceeded: " 
+            << e.what() << '\n';
+        return $ExitCodeMLE;
+    }
     catch(const std::exception &err){
         std::cerr << "Solution function failed: "
             << err.what() << std::endl;

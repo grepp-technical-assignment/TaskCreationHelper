@@ -274,8 +274,11 @@ def limitSubprocessResource(TL: float, ML: float) \
         # Setting total memory amount
         for rid in (resource.RLIMIT_AS, resource.RLIMIT_DATA,
                     resource.RLIMIT_STACK):
-            _, hardML = resource.getrlimit(rid)
-            resource.setrlimit(rid, (round(ML * 1024 ** 2), hardML))
+            try:
+                _, hardML = resource.getrlimit(rid)
+                resource.setrlimit(rid, (round(ML * 1024 ** 2), hardML))
+            except (resource.error, ValueError) as err:
+                pass
 
     return func
 

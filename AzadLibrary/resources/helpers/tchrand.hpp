@@ -48,42 +48,25 @@ namespace TCH{
         return (bool)distrib(mersenneTwister);
     }
 
-    // Generate random permutation with given size.
-    inline std::vector<int> generatePermutation(int size){
-        if(size <= 0) throw "Non-positive size given";
-        std::vector<int> result(size);
-        for(int i=0; i<size; i++) result[i] = i;
-        for(int i1=size-1; i1>=0; i1--){
-            int i2 = randint<int>(0, i1);
-            if(i1 != i2) std::swap(result[i1], result[i2]);
-        } return result;
-    }
-
     // Shuffle between two iterators.
     template <class iterator> 
     inline void shuffle(iterator begin, iterator end){
         int size = std::distance<iterator>(begin, end);
-        if(size < 0) throw "End iterator is at before begin iterator";
+        if(size < 0) 
+            std::runtime_error("End iterator is at before begin iterator");
         else if(size == 0) return;
         
-        // arr[x] := arr[perm[x]]
-        std::vector<int> perm = generatePermutation(size);
-        std::vector<bool> moved(size, false);
+        for(int i = size-1; i >= 0; i--)
+            std::swap(begin[i], begin[randint<int>(0, i)]);
+    }
 
-        // Iterate
-        for(iterator it = begin; it != end; it++){
-            if(moved[it - begin]) continue;
-
-            // itprev denotes arr[x], itafter denotes arr[perm[x]]
-            iterator itprev = it, itafter = begin + perm[itprev - begin];
-            while(itafter != it){
-                moved[itprev - begin] = true;
-                std::iter_swap(itprev, itafter);
-                itprev = itafter;
-                itafter = begin + perm[itafter - begin];
-            }
-            moved[itprev - begin] = true;
-        }
+    // Generate random permutation with given size.
+    inline std::vector<int> generatePermutation(int size, int offset = 0){
+        if(size <= 0) throw std::runtime_error("Non-positive size given");
+        std::vector<int> result(size);
+        for(int i=0; i<size; i++) result[i] = offset + i;
+        shuffle(result.begin(), result.end());
+        return result;
     }
 };
 

@@ -1,0 +1,54 @@
+{
+    "name": "Sort the List",
+    "author": "Azad",
+    "parameters": [
+        {
+            "name": "arr",
+            "type": "int",
+            "dimension": 1
+        }
+    ],
+    "return": {
+        "type": "int",
+        "dimension": 1
+    },
+    "limits": {
+        "time": 5.0,
+        "memory": 1024
+    },
+    "solutions": {
+        "AC": ["solution.cpp"],
+        "WA": [],
+        "TLE": ["slowsort.cpp"],
+        "MLE": [],
+        "FAIL": []
+    },
+    "generators": {
+        "literal": "generator_manual.cpp",
+        "random": "generator_random.cpp",
+        "perm": "generator_permutation.cpp"
+    },
+    "genscript": [
+        "literal 5 7 2 3 9",
+        "random 10 20 #1",
+        "random 10 20 #2",
+        "perm 10 #1", 
+        "perm 10 #2",
+        "random 100000 999999999 #1",
+        "random 100000 999999999 #2",
+        "perm 100000 #1",
+        "perm 100000 #2"
+    ],
+    "log": "azadlib.log",
+    "iofiles": {
+        "path": "IO",
+        "inputsyntax": "%02d.in.txt",
+        "outputsyntax": "%02d.out.txt"
+    },
+    "validator": "validator.cpp",
+    "precision": 1e-06,
+    "version": {
+        "problem": 1.0,
+        "config": 1.0
+    }
+}

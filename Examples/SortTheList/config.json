@@ -18,7 +18,7 @@
     },
     "solutions": {
         "AC": ["solution.cpp"],
-        "WA": [],
+        "AC/TLE/MLE": ["unstablequicksort.cpp"],
         "TLE": ["slowsort.cpp"],
         "MLE": [],
         "FAIL": []
@@ -34,10 +34,12 @@
         "random 10 20 #2",
         "perm 10 #1", 
         "perm 10 #2",
-        "random 100000 999999999 #1",
-        "random 100000 999999999 #2",
-        "perm 100000 #1",
-        "perm 100000 #2"
+        "random 1000000 999999999 #1",
+        "random 1000000 999999999 #2",
+        "perm 1000000 #1",
+        "perm 1000000 #2",
+        "random 1000000 2",
+        "random 1000000 3"
     ],
     "log": "azadlib.log",
     "iofiles": {

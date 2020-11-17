@@ -19,10 +19,10 @@ Write main statement here
 
 ##### 입출력 예 설명
 
-입출력 예 #1
+**입출력 예 #1**
 
 * Write notes about first example here
 
-입출력 예 #2
+**입출력 예 #2**
 
 * Write notes about second example here (if you need more then expand)

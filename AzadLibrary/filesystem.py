@@ -1,190 +1,232 @@
 """
-This module supports high level management of files.
+This module supports high level functionalities of file system.
 """
 
 # Standard libraries
-import typing
-from pathlib import Path
-import os
-import shutil
-import atexit
 import threading
-import logging
+from pathlib import Path
+import atexit
+import typing
+import shutil
+import warnings
+import os
 
 # Azad libraries
+from .constants import NullSemaphore
 from .misc import randomName, formatPathForLog
+from .errors import TempFileSystemClosed
 
-logger = logging.getLogger(__name__)
+
+def ThreadsafeDecoratorTFS(method):
+    """
+    Threadsafe decorator for TempFileSystem.
+    """
+
+    def innerFunc(self, *args, force: bool = False, **kwargs):
+        with (self.semaphore if not force else NullSemaphore):
+            return method(self, *args, **kwargs)
+    return innerFunc
+
+
+def checkIfClosed(method):
+    """
+    Closed checking decorator for TempFileSystem.
+    """
+
+    def innerFunc(self, *args, **kwargs):
+        if self.closed:
+            warnings.warn("This file system is already closed",
+                          TempFileSystemClosed)
+        else:
+            return method(self, *args, **kwargs)
+    return innerFunc
 
 
 class TempFileSystem:
     """
-    This class is used to manage temporary files with thread safety.
+    Supports temporary file system by path.
     """
 
-    def __init__(self, basePath: typing.Union[str, Path]):
+    DefaultRandomNameLength = 8
+    DefaultRandomTryIterationLimit = 10 ** 3
 
-        # BasePath should exists
-        if not basePath.exists() or basePath.is_file():
-            raise NotADirectoryError("Invalid path '%s'" % (basePath,))
+    def __init__(self, *args, **kwargs):
 
-        # Make new temporary folder
-        while True:
-            self.basePath: Path = Path(basePath) / \
-                ("tempfilesystem_" + randomName(20))
-            if not self.basePath.exists():
-                break
-        self.basePath.mkdir()
+        # Core path
+        self.path = Path(*args, **kwargs)
+        if not self.path.exists():
+            self.path.mkdir()
+        elif self.path.is_file():
+            raise NotADirectoryError("Invalid path \"%s\"" % (self.path,))
 
-        # Setup attributes
-        self.tempFiles: typing.Set[Path] = set()
+        # Other attributes
         self.semaphore = threading.BoundedSemaphore()
+        self.childs = set()
         self.closed = False
-
-        # Extra
         atexit.register(self.close, force=True)
-        logger.info("Temporary filesystem based on \"%s\" is created.",
-                    formatPathForLog(self.basePath))
 
-    def __findFeasiblePath(
-            self, extension: str = "temp", randomNameLength: int = None,
-            namePrefix: str = None) -> str:
+    def __str__(self):
+        return "Temp file system at \"%s\"" % \
+            (formatPathForLog(self.path),)
+
+    def __truediv__(self, name: str) -> Path:
+        return self.path / name
+
+    @staticmethod
+    def getName(name: str, extension: str = None,
+                namePrefix: str = None) -> str:
         """
-        Find any feasible file name to create new one.
-        This method is not threadsafe.
+        Get complete file/directory name with given prefix and extension.
         """
-        namePrefix = "" if not namePrefix else namePrefix + "_"
-        randomNameLength = 30 if not randomNameLength else randomNameLength
-        iteration, iterLimit = 0, 10 ** 3
-        while iteration < iterLimit:
-            tempFileName = namePrefix + randomName(randomNameLength) + \
-                ("." + extension if extension else "")
-            tempFilePath = self.basePath / tempFileName
-            if tempFilePath not in self.tempFiles:
-                return tempFilePath
-            else:
-                iteration += 1
-        raise OSError("Couldn't find feasible file name")
-
-    def newTempFile(self, content: typing.Union[str, bytes] = None,
-                    filename: str = None, extension: str = "temp",
-                    randomNameLength: int = None, isBytes: bool = False,
-                    namePrefix: str = None) -> Path:
-        """
-        Create file and return path.
-        - If `content` is not given, then empty file will be created.
-        - If `isBytes` is True, then file will be written in binary mode.
-        """
-        # Basic conditions
-        if self.closed:
-            raise OSError("File system closed")
-
-        # Content handling; This is independent so can be executed directly
-        if content is None:
-            pass
-        elif isBytes:  # Encode content
-            if not isinstance(content, (bytes, bytearray)):
-                content = str(content).encode()
-        else:  # Decode content
-            if isinstance(content, (bytes, bytearray)):
-                content = content.decode()
-            else:
-                content = str(content)
-
-        # Actual file creation
-        with self.semaphore:
-            if filename is not None:
-                tempFilePath = self.basePath / \
-                    (filename + (("." + extension) if extension else ""))
-                if tempFilePath in self.tempFiles:
-                    raise OSError(
-                        "Filename '%s' already exists" % (tempFilePath.name,))
-            else:
-                tempFilePath = self.__findFeasiblePath(
-                    extension=extension, randomNameLength=randomNameLength,
-                    namePrefix=namePrefix)
-            self.tempFiles.add(tempFilePath)
-            with open(tempFilePath, "wb" if isBytes else "w") as tempFile:
-                if content is not None:
-                    tempFile.write(content)
-
-        logger.debug(
-            "Temp file \"%s\" created.", formatPathForLog(tempFilePath))
-        return tempFilePath
-
-    def copy(self, origin: typing.Union[str, Path],
-             destination: str = None, extension: str = "temp",
-             randomNameLength: int = None, namePrefix: str = None) -> Path:
-        """
-        Copy the external file into current temp file system.
-        """
-        # Since we read only, it's ok to read this file directly
-        with self.semaphore:
-            if destination is not None:
-                tempFilePath = self.basePath / \
-                    (destination + (("." + extension) if extension else ""))
-                if tempFilePath in self.tempFiles:
-                    raise OSError(
-                        "Filename '%s' already exists" % (tempFilePath.name,))
-            else:
-                tempFilePath = self.__findFeasiblePath(
-                    extension=extension, randomNameLength=randomNameLength,
-                    namePrefix=namePrefix)
-            shutil.copyfile(origin, tempFilePath)
-
-        logger.debug("Temp file \"%s\" created by copying from \"%s\".",
-                     formatPathForLog(tempFilePath), formatPathForLog(origin))
-        return tempFilePath
-
-    def pop(self, filePath: typing.Union[str, Path], b: bool = False) \
-            -> typing.Union[bytes, str, None]:
-        """
-        Read a content from given temp file and remove it.
-        If given temp file is already deleted, then tolerate it instead of raising `FileNotFoundError`.
-        - `b` determines rb mode(True) or r mode(False, default).
-        """
-        # Basic conditions
-        if self.closed:
-            raise IOError("File system closed")
-
-        # Erase the file
-        if isinstance(filePath, str):
-            filePath = Path(filePath)
-        with self.semaphore:
-            if filePath not in self.tempFiles:
-                raise FileNotFoundError(
-                    "Couldn't find '%s' among registered temp files" % (filePath,))
-            try:
-                with open(filePath, "r" if not b else "rb") as tempfile:
-                    result = tempfile.read()
-                os.remove(filePath)
-            except FileNotFoundError:
-                pass
-            else:
-                logger.debug("Temp file \"%s\" popped.",
-                             formatPathForLog(filePath))
-                return result
-
-    def close(self, force: bool = False):
-        """
-        Shutdown this temp file system and remove all associated files.
-        """
-        # Already closed
-        if self.closed:
-            return
-
-        # Actual termination process
-        def doIt():
-            logger.info(
-                "Temporary filesystem based on \"%s\" is closing..",
-                formatPathForLog(self.basePath))
-            self.closed = True
-            self.tempFiles.clear()
-            shutil.rmtree(self.basePath)
-
-        # Forced or not?
-        if force:
-            doIt()
+        if namePrefix is not None:
+            prefix = namePrefix
+            if not namePrefix.endswith("/"):
+                prefix += "_"
         else:
-            with self.semaphore:
-                doIt()
+            prefix = ""
+        suffix = ("." + extension if extension is not None else "")
+        return prefix + name + suffix
+
+    def __contains(self, name: typing.Union[str, Path]):
+        """
+        Return true if there is any file/folder
+        with same name in this file system.
+        """
+        if isinstance(name, str):
+            return (self.path / name).exists()
+        elif isinstance(name, Path):
+            return name.exists() and self.path in name.parents
+        else:
+            raise TypeError("Invalid name type %s" % (type(name),))
+
+    def __findFeasibleName(
+            self, extension: str = None, namePrefix: str = None,
+            randomNameLength: int = None) -> str:
+        """
+        Find any feasible path for new file or folder's name.
+        """
+
+        length = self.DefaultRandomNameLength \
+            if randomNameLength is None else randomNameLength
+
+        for _ in range(self.DefaultRandomTryIterationLimit):
+            tempPath = self.getName(
+                randomName(length), extension=extension,
+                namePrefix=namePrefix)
+            if not self.__contains(tempPath):
+                return tempPath
+        raise OSError("Couldn't find feasible path in %d iterations" %
+                      (self.DefaultRandomTryIterationLimit,))
+
+    @checkIfClosed
+    @ThreadsafeDecoratorTFS
+    def newTempFile(
+            self, content: typing.Union[str, bytes] = None,
+            name: str = None, extension: str = None,
+            namePrefix: str = None) -> Path:
+        """
+        Make new file under this directory.
+        """
+        wmode: str = "wb" if isinstance(content, bytes) else "w"
+
+        # Determine name
+        if name is not None:
+            name = self.getName(name, extension=extension,
+                                namePrefix=namePrefix)
+            if self.__contains(name):
+                raise FileExistsError
+        else:
+            name = self.__findFeasibleName(
+                extension=extension, namePrefix=namePrefix)
+
+        # Write content and return
+        filepath = self.path / name
+        with open(filepath, wmode) as file:
+            if content is not None:
+                file.write(content)
+        return filepath
+
+    @checkIfClosed
+    @ThreadsafeDecoratorTFS
+    def newFolder(self, name: str = None, namePrefix: str = None,
+                  depth: int = 1) -> Path:
+        """
+        Make new folder under this directory.
+        If name is not None, then the depth will be ignored.
+        """
+        # Determine name
+        if name is not None:
+            name = self.getName(name, namePrefix=namePrefix)
+            if self.__contains(name):
+                raise OSError("Directory already exists")
+        else:
+            if not isinstance(depth, int) or depth < 1:
+                raise ValueError("Invalid value depth %s" % (depth,))
+            name = self.__findFeasibleName(namePrefix=namePrefix)
+            (self.path / name).mkdir()
+            for _ in range(1, depth):
+                name = self.__findFeasibleName(namePrefix=name + "/")
+                (self.path / name).mkdir()
+
+        return self.path / name
+
+    @checkIfClosed
+    @ThreadsafeDecoratorTFS
+    def copyFile(self, source: typing.Union[str, Path], destName: str = None,
+                 extension: str = None, namePrefix: str = None):
+        """
+        Copy external file into current TempFileSystem.
+        """
+        if isinstance(source, str):
+            source = Path(source)
+        if not source.exists() or not source.is_file():
+            raise FileNotFoundError
+
+        # Get name
+        if destName is not None:
+            name = self.getName(destName, extension=extension,
+                                namePrefix=namePrefix)
+            if self.__contains(name):
+                raise FileExistsError
+        else:
+            name = self.__findFeasibleName(
+                extension=extension, namePrefix=namePrefix)
+
+        # Fast copy using shutil
+        shutil.copyfile(source, self.path / name)
+        return self.path / name
+
+    @checkIfClosed
+    @ThreadsafeDecoratorTFS
+    def pop(self, name: typing.Union[str, Path], b: bool = True) -> \
+            typing.Union[str, bytes, None]:
+        """
+        Delete file or folder by given name.
+        If given name is file, return file content.
+        """
+        if isinstance(name, str):
+            path: Path = self.path / name
+        elif isinstance(name, Path):
+            path = name
+        else:
+            raise TypeError("Invalid name type %s" % (type(name),))
+
+        if not self.__contains(name):
+            raise FileNotFoundError("name = %s" % (name,))
+        elif path.is_file():  # File
+            with open(path, "rb" if b else "r") as file:
+                content = file.read()
+            os.remove(path)
+            return content
+        else:  # Directory
+            shutil.rmtree(path)
+            return None
+
+    @checkIfClosed
+    @ThreadsafeDecoratorTFS
+    def close(self):
+        """
+        Close file system by deleting everything.
+        """
+        self.closed = True
+        shutil.rmtree(self.path)

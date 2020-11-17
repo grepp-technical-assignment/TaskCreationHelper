@@ -295,3 +295,22 @@ class AzadLibraryMode(Enum):
     Produce = "produce"  # Produce AC data only
     GenerateCode = "generate_code"  # Generate code for external module only
     Help = "help"  # Print help only
+
+
+class __NullSemaphoreClass:
+    """
+    When forced task with bypassing semaphore is needed,
+    use `NullSemaphore` for convenience.
+
+    >>> import threading
+    >>> semaphore = threading.BoundedSemaphore()
+    >>> force = True
+    >>> with semaphore if not force else NullSemaphore:
+    >>>     pass
+    """
+
+    def __enter__(self): pass
+    def __exit__(self, typ, value, traceback): pass
+
+
+NullSemaphore = __NullSemaphoreClass()

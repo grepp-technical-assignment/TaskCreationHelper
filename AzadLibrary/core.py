@@ -85,7 +85,7 @@ class AzadCore:
         self.inputDatas = []
 
         # File system
-        self.fs = TempFileSystem(self.config.directory)
+        self.fs = TempFileSystem(self.config.directory / "__TCH_TFS")
 
         # Reserve termination
         atexit.register(self.terminate)
@@ -106,8 +106,9 @@ class AzadCore:
 
         # Copy helper modules
         self.helperModules[Const.SourceFileLanguage.Python3]["io"] = \
-            self.fs.copy(ExternalModule.AbstractPython3.ioHelperTemplatePath,
-                         extension="py", namePrefix="helper")
+            self.fs.copyFile(
+                ExternalModule.AbstractPython3.ioHelperTemplatePath,
+                extension="py", namePrefix="helper")
 
         # Language specification for kwargs in getModule function
         # The reason why I put this here instead of function interface is,
@@ -129,8 +130,9 @@ class AzadCore:
             # Basics
             extension = getExtension(sourceCodePath)
             lang = Const.getSourceFileLanguage(extension)
-            modulePath = self.fs.copy(sourceCodePath, extension=extension,
-                                      namePrefix=namePrefix)
+            modulePath = self.fs.copyFile(
+                sourceCodePath, extension=extension,
+                namePrefix=namePrefix)
 
             # Prepare type, args and kwargs
             moduleType = ExternalModule.getExternalModuleClass(lang, filetype)

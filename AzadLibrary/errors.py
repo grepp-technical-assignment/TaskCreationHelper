@@ -48,3 +48,15 @@ class AzadTLE(AzadError, TimeoutError):
     """
     Raised when execution exceeded TLE.
     """
+
+
+class AzadWarning(UserWarning):
+    """
+    Abstract class of all warnings.
+    """
+
+
+class TempFileSystemClosed(AzadWarning):
+    """
+    Warned when TempFileSystem is closed.
+    """

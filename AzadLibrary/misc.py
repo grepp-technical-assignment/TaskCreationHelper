@@ -50,7 +50,7 @@ def longEndSkip(message: str, maxLength: int = 100) -> str:
         return message[:maxLength - 3] + "..."
 
 
-def randomName(length: int):
+def randomName(length: int) -> str:
     """
     Return random name using English letters and numbers.
     Remind that calling this will reset random seed to arbitrary number.

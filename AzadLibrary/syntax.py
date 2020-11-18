@@ -47,9 +47,9 @@ def cleanGenscript(genscript: str, generatorNames: typing.Iterable) -> \
     """
     Validate given genscript with existing generator names.
     Assume that given generator names are already verified.
-    If given genscript is comment, return None.
-    Else if any syntax error found, raise SyntaxError.
-    Otherwise, return splitted version of genscript.
+    - If given genscript is comment, return None.
+    - Else if any syntax error found, raise SyntaxError.
+    - Otherwise, return splitted version of genscript.
     """
     genscript = genscript.strip()
     if genscriptCommentPattern.fullmatch(genscript):  # Comment

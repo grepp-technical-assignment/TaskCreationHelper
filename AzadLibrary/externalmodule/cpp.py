@@ -193,7 +193,7 @@ class CppGenerator(AbstractExternalGenerator, AbstractCpp):
             extension="log", namePrefix="err")
         compilationExitCode = self.invoke(
             compilationArgs, stderr=compilationErrorLog,
-            cwd=self.fs.path)
+            cwd=self.basePath)
         if compilationExitCode is not Const.ExitCode.Success:
             reportCompilationFailure(
                 compilationErrorLog, self.originalSourceCodePath,
@@ -253,7 +253,7 @@ class CppValidator(AbstractExternalValidator, AbstractCpp):
             extension="log", namePrefix="err")
         compilationExitCode = self.invoke(
             compilationArgs, stderr=compilationErrorLog,
-            cwd=self.fs.path)
+            cwd=self.basePath)
         if compilationExitCode is not Const.ExitCode.Success:
             reportCompilationFailure(
                 compilationErrorLog, self.originalSourceCodePath,
@@ -314,7 +314,7 @@ class CppSolution(AbstractExternalSolution, AbstractCpp):
             extension="log", namePrefix="err")
         compilationExitCode = self.invoke(
             compilationArgs, stderr=compilationErrorLog,
-            cwd=self.fs.path)
+            cwd=self.basePath)
         if compilationExitCode is not Const.ExitCode.Success:
             reportCompilationFailure(
                 compilationErrorLog, self.originalSourceCodePath,
@@ -503,7 +503,7 @@ class CSolution(AbstractExternalSolution, AbstractC):
             extension="log", namePrefix="err")
         compilationExitCode1 = self.invoke(
             compilationArgs1, stderr=compilationErrorLog1,
-            cwd=self.fs.path)
+            cwd=self.basePath)
 
         # If failed to compile C?
         if compilationExitCode1 is not Const.ExitCode.Success:
@@ -524,7 +524,7 @@ class CSolution(AbstractExternalSolution, AbstractC):
             extension="log", namePrefix="err")
         compilationExitCode2 = self.invoke(
             compilationArgs2, stderr=compilationErrorLog2,
-            cwd=self.fs.path)
+            cwd=self.basePath)
 
         # If failed to compile C++?
         if compilationExitCode2 is not Const.ExitCode.Success:
@@ -543,7 +543,7 @@ class CSolution(AbstractExternalSolution, AbstractC):
             extension="log", namePrefix="err")
         compilationExitCode3 = self.invoke(
             compilationArgs3, stderr=compilationErrorLog3,
-            cwd=self.fs.path)
+            cwd=self.basePath)
 
         # If failed last step?
         if compilationExitCode3 is not Const.ExitCode.Success:

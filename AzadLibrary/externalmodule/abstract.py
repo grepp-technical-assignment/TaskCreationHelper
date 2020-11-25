@@ -114,6 +114,7 @@ class AbstractExternalModule:
     it's meant to be COPIED module's path. `self.executable` or
     `self.modulePath` will be executed.
     """
+    originalSourceCodeStem = NotImplemented
 
     def __init__(self, fs: TempFileSystem, basePath: Path,
                  parameterInfo: Const.ParamInfoList,
@@ -124,9 +125,10 @@ class AbstractExternalModule:
         # File system configuration
         self.fs = fs
         self.basePath = basePath
+        OSCstem = self.originalSourceCodeStem
         self.originalSourceCodePath = self.fs.copyFile(
             originalSourceCodePath,
-            destName=originalSourceCodePath.stem,
+            destName=OSCstem,
             extension=originalSourceCodePath.suffix[1:],
             basePath=self.basePath)
 
@@ -268,6 +270,7 @@ class AbstractExternalGenerator(AbstractExternalModule):
     - stdin: None
     - Code structure: Preprocess -> Execution -> Print Out -> Postprocess
     """
+    originalSourceCodeStem = "externalgenerator"
 
     @classmethod
     def generateExecutionArgs(
@@ -297,8 +300,9 @@ class AbstractExternalGenerator(AbstractExternalModule):
             outfilePath, genscript,
             self.executable if self.executable else self.modulePath)
         errorLog = self.newTempFile(extension="log", namePrefix="err")
-        exitcode = self.invoke(args, stderr=errorLog,
-                               timelimit=Const.DefaultGeneratorTL, **kwargs)
+        exitcode = self.invoke(
+            args, stderr=errorLog, cwd=self.basePath,
+            timelimit=Const.DefaultGeneratorTL, **kwargs)
         return (exitcode, outfilePath, errorLog)
 
 
@@ -310,6 +314,7 @@ class AbstractExternalValidator(AbstractExternalModule):
 
     - argv: `[]`
     """
+    originalSourceCodeStem = "externalvalidator"
 
     @classmethod
     def generateExecutionArgs(cls, modulePath: typing.Union[str, Path],
@@ -335,8 +340,9 @@ class AbstractExternalValidator(AbstractExternalModule):
         args = self.generateExecutionArgs(
             self.executable if self.executable else self.modulePath)
         errorLog = self.newTempFile(extension="log", namePrefix="err")
-        exitcode = self.invoke(args, stdin=infile, stderr=errorLog,
-                               timelimit=Const.DefaultValidatorTL, **kwargs)
+        exitcode = self.invoke(
+            args, stdin=infile, stderr=errorLog, cwd=self.basePath,
+            timelimit=Const.DefaultValidatorTL, **kwargs)
         return (exitcode, None, errorLog)
 
 
@@ -346,6 +352,7 @@ class AbstractExternalSolution(AbstractExternalModule):
 
     - argv: `[outfile]`
     """
+    originalSourceCodeStem = "externalsolution"
 
     @classmethod
     def generateExecutionArgs(
@@ -374,5 +381,6 @@ class AbstractExternalSolution(AbstractExternalModule):
         args = self.generateExecutionArgs(
             outfilePath, self.executable if self.executable else self.modulePath)
         errorLog = self.newTempFile(extension="log", namePrefix="err")
-        exitcode = self.invoke(args, stdin=infile, stderr=errorLog, **kwargs)
+        exitcode = self.invoke(
+            args, stdin=infile, stderr=errorLog, cwd=self.basePath, **kwargs)
         return (exitcode, outfilePath, errorLog)

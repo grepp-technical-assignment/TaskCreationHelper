@@ -87,9 +87,6 @@ class TempFileSystem:
         return "Temp file system at \"%s\"" % \
             (formatPathForLog(self.path),)
 
-    def __truediv__(self, name: str) -> Path:
-        return self.path / name
-
     @staticmethod
     def getName(name: str, extension: str = None,
                 namePrefix: str = None) -> str:

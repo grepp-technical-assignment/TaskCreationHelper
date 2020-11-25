@@ -93,10 +93,7 @@ class TempFileSystem:
         """
         Get complete file/directory name with given prefix and extension.
         """
-        if namePrefix is not None:
-            prefix = namePrefix + "_"
-        else:
-            prefix = ""
+        prefix = (namePrefix + "_") if namePrefix is not None else ""
         suffix = ("." + extension if extension is not None else "")
         return prefix + name + suffix
 

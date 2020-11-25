@@ -126,7 +126,8 @@ class Python3Generator(AbstractExternalGenerator, AbstractPython3):
 
     def __init__(self, *args, ioHelperModulePath: Path = None, **kwargs):
         super().__init__(*args, **kwargs)
-        self.ioHelperModulePath = ioHelperModulePath
+        self.ioHelperModulePath = self.newTempFileByCopy(
+            ioHelperModulePath, extension="py", namePrefix="iohelper")
 
     @classmethod
     def generateCode(
@@ -152,11 +153,11 @@ class Python3Generator(AbstractExternalGenerator, AbstractPython3):
         if self.prepared:
             raise AzadError("Already prepared")
         code = self.generateCode(
-            self.originalModulePath, self.parameterInfo,
+            self.originalSourceCodePath, self.parameterInfo,
             self.ioHelperModulePath)
-        self.modulePath = self.fs.newTempFile(
-            code, extension=Const.SourceFileLanguage.Python3.value,
-            namePrefix="generator")
+        self.modulePath = self.newTempFile(
+            extension=Const.SourceFileLanguage.Python3.value,
+            namePrefix="generator", content=code)
         self.prepared = True
 
 
@@ -171,7 +172,8 @@ class Python3Validator(AbstractExternalValidator, AbstractPython3):
 
     def __init__(self, *args, ioHelperModulePath: Path = None, **kwargs):
         super().__init__(*args, **kwargs)
-        self.ioHelperModulePath = ioHelperModulePath
+        self.ioHelperModulePath = self.newTempFileByCopy(
+            ioHelperModulePath, extension="py", namePrefix="iohelper")
 
     @classmethod
     def generateCode(
@@ -196,11 +198,11 @@ class Python3Validator(AbstractExternalValidator, AbstractPython3):
         if self.prepared:
             raise AzadError("Already prepared")
         code = self.generateCode(
-            self.originalModulePath, self.parameterInfo,
+            self.originalSourceCodePath, self.parameterInfo,
             self.returnInfo, self.ioHelperModulePath)
-        self.modulePath = self.fs.newTempFile(
-            code, extension=Const.SourceFileLanguage.Python3.value,
-            namePrefix="validator")
+        self.modulePath = self.newTempFile(
+            extension=Const.SourceFileLanguage.Python3.value,
+            namePrefix="validator", content=code)
         self.prepared = True
 
 
@@ -215,7 +217,8 @@ class Python3Solution(AbstractExternalSolution, AbstractPython3):
 
     def __init__(self, *args, ioHelperModulePath: Path = None, **kwargs):
         super().__init__(*args, **kwargs)
-        self.ioHelperModulePath = ioHelperModulePath
+        self.ioHelperModulePath = self.newTempFileByCopy(
+            ioHelperModulePath, extension="py", namePrefix="iohelper")
 
     @classmethod
     def generateCode(
@@ -241,9 +244,9 @@ class Python3Solution(AbstractExternalSolution, AbstractPython3):
         if self.prepared:
             raise AzadError("Already prepared")
         code = self.generateCode(
-            self.originalModulePath, self.parameterInfo,
+            self.originalSourceCodePath, self.parameterInfo,
             self.returnInfo, self.ioHelperModulePath)
-        self.modulePath = self.fs.newTempFile(
-            code, extension=Const.SourceFileLanguage.Python3.value,
-            namePrefix="solution")
+        self.modulePath = self.newTempFile(
+            extension=Const.SourceFileLanguage.Python3.value,
+            namePrefix="solution", content=code)
         self.prepared = True

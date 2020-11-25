@@ -115,14 +115,26 @@ class AbstractExternalModule:
     `self.modulePath` will be executed.
     """
 
-    def __init__(self, originalModulePath: Path, fs: TempFileSystem,
+    def __init__(self, fs: TempFileSystem, basePath: Path,
                  parameterInfo: Const.ParamInfoList,
                  returnInfo: Const.ReturnInfoType,
+                 originalSourceCodePath: Path,
                  *args, name: str = "", **kwargs):
-        self.originalModulePath = originalModulePath
+
+        # File system configuration
         self.fs = fs
+        self.basePath = basePath
+        self.originalSourceCodePath = self.fs.copyFile(
+            originalSourceCodePath,
+            destName=originalSourceCodePath.stem,
+            extension=originalSourceCodePath.suffix[1:],
+            basePath=self.basePath)
+
+        # Parameter/Return info
         self.parameterInfo = parameterInfo
         self.returnInfo = returnInfo
+
+        # Misc
         self.prepared = False
         self.modulePath: Const.OptionalPath = None  # Execution Priority #2
         self.executable: Const.OptionalPath = None  # Execution Priority #1
@@ -229,6 +241,22 @@ class AbstractExternalModule:
         """
         raise NotImplementedError
 
+    def newTempFile(self, extension: str = None, namePrefix: str = None,
+                    content: typing.Union[str, bytes] = None) -> Path:
+        """
+        Alias of `self.fs.newTempFile`, but with `self.basePath`.
+        """
+        return self.fs.newTempFile(
+            content=content, extension=extension,
+            namePrefix=namePrefix, basePath=self.basePath)
+
+    def newTempFileByCopy(
+            self, original: Path, extension: str = None,
+            namePrefix: str = None) -> Path:
+        return self.fs.copyFile(
+            source=original, extension=extension,
+            namePrefix=namePrefix, basePath=self.basePath)
+
 
 class AbstractExternalGenerator(AbstractExternalModule):
     """
@@ -264,11 +292,11 @@ class AbstractExternalGenerator(AbstractExternalModule):
         """
         if not self.prepared:
             raise AzadError("Generator not prepared")
-        outfilePath = self.fs.newTempFile(extension="data", namePrefix="in")
+        outfilePath = self.newTempFile(extension="data", namePrefix="in")
         args = self.generateExecutionArgs(
             outfilePath, genscript,
             self.executable if self.executable else self.modulePath)
-        errorLog = self.fs.newTempFile(extension="log", namePrefix="err")
+        errorLog = self.newTempFile(extension="log", namePrefix="err")
         exitcode = self.invoke(args, stderr=errorLog,
                                timelimit=Const.DefaultGeneratorTL, **kwargs)
         return (exitcode, outfilePath, errorLog)
@@ -306,7 +334,7 @@ class AbstractExternalValidator(AbstractExternalModule):
             self.preparePipeline()
         args = self.generateExecutionArgs(
             self.executable if self.executable else self.modulePath)
-        errorLog = self.fs.newTempFile(extension="log", namePrefix="err")
+        errorLog = self.newTempFile(extension="log", namePrefix="err")
         exitcode = self.invoke(args, stdin=infile, stderr=errorLog,
                                timelimit=Const.DefaultValidatorTL, **kwargs)
         return (exitcode, None, errorLog)
@@ -342,9 +370,9 @@ class AbstractExternalSolution(AbstractExternalModule):
         """
         if not self.prepared:
             raise OSError("Generator not prepared")
-        outfilePath = self.fs.newTempFile(extension="data", namePrefix="out")
+        outfilePath = self.newTempFile(extension="data", namePrefix="out")
         args = self.generateExecutionArgs(
             outfilePath, self.executable if self.executable else self.modulePath)
-        errorLog = self.fs.newTempFile(extension="log", namePrefix="err")
+        errorLog = self.newTempFile(extension="log", namePrefix="err")
         exitcode = self.invoke(args, stdin=infile, stderr=errorLog, **kwargs)
         return (exitcode, outfilePath, errorLog)

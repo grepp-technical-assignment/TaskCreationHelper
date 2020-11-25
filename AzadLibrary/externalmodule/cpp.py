@@ -181,22 +181,22 @@ class CppGenerator(AbstractExternalGenerator, AbstractCpp):
 
         # Prepare original stuffs
         code = self.generateCode(self.parameterInfo)
-        self.modulePath = self.fs.newTempFile(
+        self.modulePath = self.newTempFile(
             content=code, extension="cpp", namePrefix="generator")
 
         # Compile
-        self.executable = self.fs.newTempFile(
+        self.executable = self.newTempFile(
             extension="exe", namePrefix="generator")
         compilationArgs = self.generateCompilationArgs(
-            self.modulePath, self.executable, self.originalModulePath)
-        compilationErrorLog = self.fs.newTempFile(
+            self.modulePath, self.executable, self.originalSourceCodePath)
+        compilationErrorLog = self.newTempFile(
             extension="log", namePrefix="err")
         compilationExitCode = self.invoke(
             compilationArgs, stderr=compilationErrorLog,
             cwd=self.fs.path)
         if compilationExitCode is not Const.ExitCode.Success:
             reportCompilationFailure(
-                compilationErrorLog, self.originalModulePath,
+                compilationErrorLog, self.originalSourceCodePath,
                 compilationArgs, Const.SourceFileType.Generator)
 
         self.prepared = True
@@ -241,22 +241,22 @@ class CppValidator(AbstractExternalValidator, AbstractCpp):
 
         # Prepare original stuffs
         code = self.generateCode(self.parameterInfo, self.returnInfo)
-        self.modulePath = self.fs.newTempFile(
+        self.modulePath = self.newTempFile(
             content=code, extension="cpp", namePrefix="validator")
 
         # Compile
-        self.executable = self.fs.newTempFile(
+        self.executable = self.newTempFile(
             extension="exe", namePrefix="validator")
         compilationArgs = self.generateCompilationArgs(
-            self.modulePath, self.executable, self.originalModulePath)
-        compilationErrorLog = self.fs.newTempFile(
+            self.modulePath, self.executable, self.originalSourceCodePath)
+        compilationErrorLog = self.newTempFile(
             extension="log", namePrefix="err")
         compilationExitCode = self.invoke(
             compilationArgs, stderr=compilationErrorLog,
             cwd=self.fs.path)
         if compilationExitCode is not Const.ExitCode.Success:
             reportCompilationFailure(
-                compilationErrorLog, self.originalModulePath,
+                compilationErrorLog, self.originalSourceCodePath,
                 compilationArgs, Const.SourceFileType.Validator)
 
         self.prepared = True
@@ -301,23 +301,23 @@ class CppSolution(AbstractExternalSolution, AbstractCpp):
 
         # Prepare original stuffs
         code = self.generateCode(self.parameterInfo, self.returnInfo)
-        self.modulePath = self.fs.newTempFile(
+        self.modulePath = self.newTempFile(
             content=code, extension="cpp", namePrefix="solution")
 
         # Compile
-        self.executable = self.fs.newTempFile(
+        self.executable = self.newTempFile(
             extension="exe", namePrefix="solution")
         compilationArgs = self.generateCompilationArgs(
             self.modulePath, self.executable,
-            self.originalModulePath)
-        compilationErrorLog = self.fs.newTempFile(
+            self.originalSourceCodePath)
+        compilationErrorLog = self.newTempFile(
             extension="log", namePrefix="err")
         compilationExitCode = self.invoke(
             compilationArgs, stderr=compilationErrorLog,
             cwd=self.fs.path)
         if compilationExitCode is not Const.ExitCode.Success:
             reportCompilationFailure(
-                compilationErrorLog, self.originalModulePath,
+                compilationErrorLog, self.originalSourceCodePath,
                 compilationArgs, Const.SourceFileType.Solution)
 
         self.prepared = True
@@ -488,18 +488,18 @@ class CSolution(AbstractExternalSolution, AbstractC):
 
         # Prepare original stuffs
         code = self.generateCode(self.parameterInfo, self.returnInfo)
-        self.modulePath = self.fs.newTempFile(
+        self.modulePath = self.newTempFile(
             content=code, extension="cpp", namePrefix="solution")
 
         # Compile: C
-        executableTempC = self.fs.newTempFile(
+        executableTempC = self.newTempFile(
             extension="exe", namePrefix="solution")
         compilationArgs1 = [
-            "gcc", "-c", self.originalModulePath,
+            "gcc", "-c", self.originalSourceCodePath,
             "-std=c11", "-O2", "-Wall",
             "-I", self.helperHeadersPath,
             "-o", executableTempC]
-        compilationErrorLog1 = self.fs.newTempFile(
+        compilationErrorLog1 = self.newTempFile(
             extension="log", namePrefix="err")
         compilationExitCode1 = self.invoke(
             compilationArgs1, stderr=compilationErrorLog1,
@@ -508,11 +508,11 @@ class CSolution(AbstractExternalSolution, AbstractC):
         # If failed to compile C?
         if compilationExitCode1 is not Const.ExitCode.Success:
             reportCompilationFailure(
-                compilationErrorLog1, self.originalModulePath,
+                compilationErrorLog1, self.originalSourceCodePath,
                 compilationArgs1, Const.SourceFileType.Solution)
 
         # Compile: C++
-        executableTempCpp = self.fs.newTempFile(
+        executableTempCpp = self.newTempFile(
             extension="exe", namePrefix="solution")
         compilationArgs2 = [
             "g++", "-c", self.modulePath,
@@ -520,7 +520,7 @@ class CSolution(AbstractExternalSolution, AbstractC):
             "-I", self.helperHeadersPath,
             "-o", executableTempCpp
         ]
-        compilationErrorLog2 = self.fs.newTempFile(
+        compilationErrorLog2 = self.newTempFile(
             extension="log", namePrefix="err")
         compilationExitCode2 = self.invoke(
             compilationArgs2, stderr=compilationErrorLog2,
@@ -533,13 +533,13 @@ class CSolution(AbstractExternalSolution, AbstractC):
                 compilationArgs2, Const.SourceFileType.Solution)
 
         # Compile: Together
-        self.executable = self.fs.newTempFile(
+        self.executable = self.newTempFile(
             extension="exe", namePrefix="solution")
         compilationArgs3 = [
             "g++", executableTempC, executableTempCpp,
             "-o", self.executable
         ]
-        compilationErrorLog3 = self.fs.newTempFile(
+        compilationErrorLog3 = self.newTempFile(
             extension="log", namePrefix="err")
         compilationExitCode3 = self.invoke(
             compilationArgs3, stderr=compilationErrorLog3,

@@ -76,9 +76,6 @@ class AzadCore:
             typing.Tuple[Const.IOVariableTypes, ...],
             typing.List[ExternalModule.AbstractExternalSolution]
         ] = {}  # {(category, ...): [module, ...]}
-        self.helperModules: typing.Mapping[  # {lang: {name: path, ...}}
-            Const.SourceFileLanguage, typing.Mapping[str, Path]
-        ] = {lang: {} for lang in Const.SourceFileLanguage}
 
         # Inner attributes and flags
         self.producedAnswers = []
@@ -104,40 +101,31 @@ class AzadCore:
         """
         logger.info("Preparing modules..")
 
-        # Copy helper modules
-        self.helperModules[Const.SourceFileLanguage.Python3]["io"] = \
-            self.fs.copyFile(
-                ExternalModule.AbstractPython3.ioHelperTemplatePath,
-                extension="py", namePrefix="helper")
-
         # Language specification for kwargs in getModule function
         # The reason why I put this here instead of function interface is,
         # because these values are dynamic(unpredictable).
         _kwargs_lang_specification = {
             Const.SourceFileLanguage.Python3: {
                 "ioHelperModulePath":
-                self.helperModules[Const.SourceFileLanguage.Python3]["io"]
+                ExternalModule.AbstractPython3.ioHelperTemplatePath
             }
         }
 
-        def getModule(
-            sourceCodePath: Path, filetype: Const.SourceFileType,
-            name: str, namePrefix: str = None) -> \
-                ExternalModule.AbstractExternalModule:
+        def getModule(sourceCodePath: Path, filetype: Const.SourceFileType,
+                      name: str) -> ExternalModule.AbstractExternalModule:
             """
             Helper function for getting module.
             """
             # Basics
             extension = getExtension(sourceCodePath)
             lang = Const.getSourceFileLanguage(extension)
-            modulePath = self.fs.copyFile(
-                sourceCodePath, extension=extension,
-                namePrefix=namePrefix)
+            moduleFolder = self.fs.newFolder(namePrefix=filetype.name)
 
             # Prepare type, args and kwargs
             moduleType = ExternalModule.getExternalModuleClass(lang, filetype)
-            args = (modulePath, self.fs, self.config.parameters,
-                    (self.config.returnType, self.config.returnDimension))
+            args = (self.fs, moduleFolder, self.config.parameters,
+                    (self.config.returnType, self.config.returnDimension),
+                    sourceCodePath)
             kwargs = {"name": name}
             if lang in _kwargs_lang_specification:
                 kwargs.update(_kwargs_lang_specification[lang])
@@ -150,8 +138,7 @@ class AzadCore:
             self.generatorModules[generatorName] = getModule(
                 self.config.generators[generatorName],
                 Const.SourceFileType.Generator,
-                "Generator %s" % (generatorName,),
-                namePrefix="origin_generator")
+                "Generator %s" % (generatorName,))
             self.generatorModules[generatorName].preparePipeline()
             logger.debug("Prepared generator \"%s\".", generatorName)
 
@@ -159,8 +146,7 @@ class AzadCore:
         if self.config.validator:
             self.validatorModule = getModule(
                 self.config.validator,
-                Const.SourceFileType.Validator, "Validator",
-                namePrefix="origin_validator")
+                Const.SourceFileType.Validator, "Validator")
             self.validatorModule.preparePipeline()
             logger.debug("Prepared validator.")
 
@@ -170,8 +156,7 @@ class AzadCore:
             for path in self.config.solutions[categories]:
                 self.solutionModules[categories].append(getModule(
                     path, Const.SourceFileType.Solution,
-                    "Solution '%s'" % (formatPathForLog(path),),
-                    namePrefix="origin_solution"))
+                    "Solution '%s'" % (formatPathForLog(path),)))
                 self.solutionModules[categories][-1].preparePipeline()
                 logger.debug("Prepared solution \"%s\".",
                              formatPathForLog(path))

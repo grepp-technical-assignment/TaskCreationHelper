@@ -100,6 +100,9 @@ class AbstractProgrammingLanguage:
         """
         raise NotImplementedError
 
+    # Converted variable name on actual code
+    vnameByPname = (lambda name: "_param_%s" % (name,))
+
 
 class AbstractExternalModule:
     """

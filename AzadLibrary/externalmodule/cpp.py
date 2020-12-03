@@ -70,9 +70,6 @@ class AbstractCpp(AbstractProgrammingLanguage):
     indentLevelParameterGet = 2
     indentLevelParameterPrint = 2
 
-    # Converted variable name on C++ code
-    vnameByPname = (lambda name: "_param_%s" % (name,))
-
     @classmethod
     def templateDict(
             cls, *args, parameterInfo: typing.List[typing.Tuple[

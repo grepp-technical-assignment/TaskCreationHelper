@@ -144,6 +144,17 @@ class AbstractCpp(AbstractProgrammingLanguage):
              parameterDimension,
              cls.vnameByPname(variableName))
 
+    @classmethod
+    def generateCompilationArgs(
+            cls, mainModulePath: Path, executable: Path,
+            originalModulePath: Path, *args, **kwargs) -> Const.ArgType:
+        return [
+            "g++", "-Wall", "-std=c++17", "-O2",
+            "-I", cls.helperHeadersPath,
+            mainModulePath, originalModulePath,
+            "-o", executable
+        ]
+
 
 class CppGenerator(AbstractExternalGenerator, AbstractCpp):
     """
@@ -155,15 +166,8 @@ class CppGenerator(AbstractExternalGenerator, AbstractCpp):
     """
 
     @classmethod
-    def generateCompilationArgs(
-            cls, mainModulePath: Path, executable: Path,
-            originalModulePath: Path, *args, **kwargs) -> Const.ArgType:
-        return [
-            "g++", "-Wall", "-std=c++17", "-O2",
-            "-I", cls.helperHeadersPath,
-            mainModulePath, originalModulePath,
-            "-o", executable
-        ]
+    def generateCompilationArgs(cls, *args, **kwargs) -> Const.ArgType:
+        return AbstractCpp.generateCompilationArgs(*args, **kwargs)
 
     @classmethod
     def generateCode(
@@ -212,15 +216,8 @@ class CppValidator(AbstractExternalValidator, AbstractCpp):
     """
 
     @classmethod
-    def generateCompilationArgs(
-            cls, mainModulePath: Path, executable: Path,
-            originalModulePath: Path, *args, **kwargs) -> Const.ArgType:
-        return [
-            "g++", "-Wall", "-std=c++17", "-O2",
-            "-I", cls.helperHeadersPath,
-            mainModulePath, originalModulePath,
-            "-o", executable
-        ]
+    def generateCompilationArgs(cls, *args, **kwargs) -> Const.ArgType:
+        return AbstractCpp.generateCompilationArgs(*args, **kwargs)
 
     @classmethod
     def generateCode(
@@ -272,15 +269,8 @@ class CppSolution(AbstractExternalSolution, AbstractCpp):
     """
 
     @classmethod
-    def generateCompilationArgs(
-            cls, mainModulePath: Path, executable: Path,
-            originalModulePath: Path, *args, **kwargs) -> Const.ArgType:
-        return [
-            "g++", "-Wall", "-std=c++17", "-O2",
-            "-I", cls.helperHeadersPath,
-            mainModulePath, originalModulePath,
-            "-o", executable
-        ]
+    def generateCompilationArgs(cls, *args, **kwargs) -> Const.ArgType:
+        return AbstractCpp.generateCompilationArgs(*args, **kwargs)
 
     @classmethod
     def generateCode(

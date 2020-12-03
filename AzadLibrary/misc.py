@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 # Azad libraries
 from . import constants as Const
 from .syntax import extensionSyntax
+from .errors import AzadError
 
 
 def barLine(message: str, lineLength: int = 120) -> str:
@@ -307,6 +308,25 @@ def reportSolutionStatistics(
     logger.debug("Verdicts: [%s]", ", ".join(v.name for v in verdicts))
     logger.debug("DT distribution: [%s]", ", ".join(
         "%gs" % (dt,) for dt in dtDistribution))
+
+
+def reportCompilationFailure(
+        errLogPath: Path, modulePath: Path,
+        args: typing.List[typing.Union[str, Path]],
+        moduleType: Const.SourceFileType):
+    """
+    Report compilation failure.
+    """
+    newArgs = [formatPathForLog(arg) if isinstance(arg, Path)
+               else arg for arg in args]
+    with open(errLogPath, "r") as errLogFile:
+        logger.error(
+            "Compilation failure on %s \"%s\"; args = %s, log =\n%s",
+            moduleType.name, formatPathForLog(modulePath),
+            newArgs, errLogFile.read())
+        raise AzadError(
+            "Compilation failure on %s \"%s\"; args = %s" %
+            (moduleType.name, formatPathForLog(modulePath), newArgs))
 
 
 if __name__ == "__main__":

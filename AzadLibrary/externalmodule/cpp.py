@@ -11,30 +11,14 @@ logger = logging.getLogger(__name__)
 
 # Azad libraries
 from .. import constants as Const
-from ..misc import isExistingFile, removeExtension, formatPathForLog
+from ..misc import (
+    isExistingFile, removeExtension,
+    formatPathForLog, reportCompilationFailure
+)
 from ..errors import AzadError
 from .abstract import (
     AbstractProgrammingLanguage, AbstractExternalGenerator,
     AbstractExternalValidator, AbstractExternalSolution)
-
-
-def reportCompilationFailure(
-        errLogPath: Path, modulePath: Path,
-        args: typing.List[typing.Union[str, Path]],
-        moduleType: Const.SourceFileType):
-    """
-    Report C/C++ compilation failure.
-    """
-    newArgs = [formatPathForLog(arg) if isinstance(arg, Path)
-               else arg for arg in args]
-    with open(errLogPath, "r") as errLogFile:
-        logger.error(
-            "Compilation failure on %s \"%s\"; args = %s, log =\n%s",
-            moduleType.name, formatPathForLog(modulePath),
-            newArgs, errLogFile.read())
-        raise AzadError(
-            "Compilation failure on %s \"%s\"; args = %s" %
-            (moduleType.name, formatPathForLog(modulePath), newArgs))
 
 
 class AbstractCpp(AbstractProgrammingLanguage):

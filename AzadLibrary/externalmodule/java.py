@@ -161,5 +161,7 @@ class JavaSolution(AbstractExternalSolution, AbstractJava):
 
     @staticmethod
     def invoke(*args, **kwargs) -> Const.ExitCode:
+        if "memorylimit" in kwargs:
+            del kwargs["memorylimit"]
         return super(JavaSolution, JavaSolution).invoke(
             *args, memorylimit=2**20, **kwargs)

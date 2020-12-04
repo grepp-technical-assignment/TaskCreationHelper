@@ -19,6 +19,7 @@ from .cpp import (
     AbstractCpp, CppGenerator, CppSolution, CppValidator,
     AbstractC, CSolution
 )
+from .java import JavaSolution, AbstractJava
 
 _classes = {
     Const.SourceFileLanguage.Python3: {
@@ -33,6 +34,9 @@ _classes = {
     },
     Const.SourceFileLanguage.C: {
         Const.SourceFileType.Solution: CSolution,
+    },
+    Const.SourceFileLanguage.Java: {
+        Const.SourceFileType.Solution: JavaSolution,
     }
 }
 

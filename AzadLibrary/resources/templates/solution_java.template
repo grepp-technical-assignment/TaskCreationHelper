@@ -1,0 +1,27 @@
+// Standard libraries
+import java.io.FileWriter;
+import java.io.IOException;
+import java.util.Scanner;
+
+// Public Class
+public class solution_java{
+
+    // Main function
+    public static void main(String[] args) throws IOException{
+         
+        Scanner sc = new Scanner(System.in);
+        $InitParameters
+        $GetParameters
+        
+        // Execution
+        $ReturnType result = (new Solution()).solution($SendParameters);
+
+        // Write result
+        FileWriter fw = new FileWriter(args[0]);
+        tchio.put(fw, result);
+        fw.close();
+
+        // Successful exit
+        System.exit($ExitCodeSuccess);
+    }
+};

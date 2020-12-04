@@ -27,7 +27,7 @@
         "memory": 1024
     },
     "solutions": {
-        "AC": ["solution.py", "solution.cpp", "solution.c"],
+        "AC": ["solution.py", "solution.cpp", "solution.c", "solution.java"],
         "WA": ["wrong_answer.py", "wrong_answer.cpp"],
         "TLE": ["tle.py", "tle.cpp"],
         "MLE": ["mle.cpp"],

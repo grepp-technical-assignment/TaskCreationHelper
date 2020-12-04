@@ -212,3 +212,4 @@ There are two types of I/O Data Protocol in TCH.
 ## v0.6
 
 - New supported language: Java.
+- Refactored temporary file system; Multiple depth is now allowed.

@@ -7,7 +7,7 @@ import re
 import typing
 
 # Variable name syntax
-variableNamePattern = "[a-z_][a-zA-Z0-9_]{0,15}"
+variableNamePattern = "[a-z_][a-z0-9_]{0,15}"  # Lowercase only
 bannedVariableNames = (
     "int", "str", "bool", "long", "float", "double", "short",  # Direct type names
     "integer", "string", "boolean", "number",

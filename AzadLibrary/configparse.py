@@ -7,6 +7,7 @@ import logging
 from pathlib import Path
 import warnings
 import typing
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -14,6 +15,7 @@ logger = logging.getLogger(__name__)
 from . import constants as Const, syntax as Syntax
 from .misc import setupLoggers, isExistingFile
 from .errors import AzadError, VersionError
+from .syntax import variableNamePattern
 
 
 class TaskConfiguration:
@@ -103,8 +105,10 @@ class TaskConfiguration:
                 Const.getIOVariableType(obj["type"]), int(obj["dimension"])
             if varName in [p[0] for p in self.parameters]:
                 raise ValueError(
-                    "Parameter name %s occurred multiple times" %
+                    "Parameter name \"%s\" occurred multiple times" %
                     (varName,))
+            elif not re.fullmatch(variableNamePattern, varName):
+                raise SyntaxError("Invalid parameter name \"%s\"" % (varName,))
             elif not (0 <= dimension <= Const.MaxParameterDimensionAllowed):
                 raise ValueError("Invalid dimension %d in parameter %s" %
                                  (dimension, varName))

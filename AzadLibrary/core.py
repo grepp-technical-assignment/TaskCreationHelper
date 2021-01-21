@@ -167,6 +167,8 @@ class AzadCore:
         If there is an error in any generation process, raise an error.
         """
         if not self.config.genscripts:
+            with open(self.config.directory / "rnlog.log", "a") as rnlogger:
+                rnlogger.write('GEN_SCRIPT_EXIST\n')
             raise ValueError("There is no genscript")
         logger.info("Generating input data..")
 
@@ -204,6 +206,10 @@ class AzadCore:
                         "Generation #%d failed(%s, genscript = \"%s\"); Error log:\n%s",
                         i + 1, exitcode.name, self.config.genscripts[i],
                         errorLogFile.read())
+                    with open(self.config.directory / "rnlog.log", "a") as rnlogger:
+                        rnlogger.write("GENFAIL %d %s %s %s\n" % (
+                            i + 1, exitcode.name, self.config.genscripts[i],
+                            errorLogFile.read()))
             else:  # Even if exit code is success, try parsing
                 try:
                     iterator = IOData.yieldLines(inputDataPath)
@@ -212,6 +218,9 @@ class AzadCore:
                 except (StopIteration, TypeError, ValueError) as err:
                     logger.error("Error raised while parsing input data #%d (genscript = \"%s\")",
                                  i + 1, self.config.genscripts[i])
+                    with open(self.config.directory / "rnlog.log", "a") as rnlogger:
+                        rnlogger.write("GENFAIL_PARSE %d %s\n" % (
+                            i + 1, self.config.genscripts[i]))
                     raise err.with_traceback(err.__traceback__)
 
         # Finalize
@@ -231,6 +240,8 @@ class AzadCore:
         """
         if self.validatorModule is None:  # If there isn't module just go
             warnings.warn("There is no validator")
+            with open(self.config.directory / "rnlog.log", "a") as rnlogger:
+                rnlogger.write('VALIDATOR_EXIST\n')
             return
 
         # Prepare stuffs
@@ -262,6 +273,9 @@ class AzadCore:
                     logger.error(
                         "Validation #%d failed(%s); Error log:\n%s",
                         i + 1, exitcode.name, errorLogFile.read())
+                    with open(self.config.directory / "rnlog.log", "a") as rnlogger:
+                        rnlogger.write("VALIDATOR_ERROR %d %s %s\n" % (
+                            i + 1, exitcode.name, errorLogFile.read()))
         if failedIndices:
             raise Errors.FailedDataValidation(
                 "Validation process failed on %s; Please check log file" %
@@ -341,6 +355,12 @@ class AzadCore:
         reportSolutionStatistics(verdicts, dtDistribution)
         verdictCount = {verdict: verdicts.count(verdict)
                         for verdict in Const.Verdict}
+        with open(self.config.directory / "rnlog.log", "a") as rnlogger:
+            rnlogger.write('VERDICT %s %s %s\n' % (verdict.name, solutionName, " ".join("%s" % (
+                verdict.name) for verdict in verdicts)))
+        with open(self.config.directory / "rnlog.log", "a") as rnlogger:
+            rnlogger.write('DT %s %s %s\n' % (verdict.name, solutionName, " ".join(
+                "%g" % (dt,) for dt in dtDistribution)))
 
         # What if verdict is wrong?
         if not validateVerdict(verdictCount, *intendedCategories):
@@ -411,6 +431,8 @@ class AzadCore:
                 self.fs.pop(answerFile)
             except (ValueError, TypeError) as err:  # Produced wrong data
                 logger.error("Main solution produced wrong data on #%d", i + 1)
+                with open(self.config.directory / "rnlog.log", "a") as rnlogger:
+                    rnlogger.write("MAIN_WA\n")
                 raise err.with_traceback(err.__traceback__)
         del answerFiles
 

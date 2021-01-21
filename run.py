@@ -112,6 +112,8 @@ if __name__ == "__main__":
         logger = logging.getLogger(__name__)
 
         try:
+            with open(Core.config.directory / "rnlog.log", "w") as rnlogger:
+                pass
             Core.run(mode)
         except BaseException as err:
             if parsedResult.pause_on_err:
@@ -119,9 +121,13 @@ if __name__ == "__main__":
             logger.error("\n" + "".join(traceback.format_exception(
                 type(err), err, err.__traceback__)))
             logger.error("TCH FAILED. Please look at log.")
+            with open(Core.config.directory / "rnlog.log", "a") as rnlogger:
+                rnlogger.write("TCH_FAILED\n")
             exit(1)
         else:
             logger.info("TCH SUCCEEDED!")
+            with open(Core.config.directory / "rnlog.log", "a") as rnlogger:
+                rnlogger.write("TCH_SUCCESS\n")
 
     else:
         raise ValueError(

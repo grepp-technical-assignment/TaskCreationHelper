@@ -1,0 +1,39 @@
+# GEN_SCRIPT_EXIST
+gen sciprt가 존재하지 않음
+* GEN_SCRIPT_EXIST
+
+# GENFAIL
+인풋 파일 생성 실패 ( 컴파일 에러 )
+* GENFAIL INDEX EXIT_CODE GEN_SCRIPT ERROR_LOG
+
+# GENFAIL_PARSE
+인풋 파일 생성 실패 ( 스크립트 파싱 에러 )
+* GENFAIL_PARSE INDEX GEN_SCRIPT
+
+# VALIDATOR_EXIST
+validator 없음
+* VALIDATOR_EXIST
+
+# VALIDATOR_ERROR
+validator 에러
+* VALIDATOR_ERROR INDEX EXIT_CODE ERROR_LOG
+
+# MAIN_WA
+main 솔루션이 WA를 받음
+* MAIN_WA
+
+# VERDICT
+솔루션 결과
+* VERDICT AC (MAIN?) SOLUTION_NAME VERDICTS
+
+# DT
+솔루션 시간
+* DT AC (MAIN?) SOLUTION_NAME DTS
+
+# TCH_FAILED
+task 생성에 실패함
+* TCH_FAILED
+
+# TCH_SUCCESS
+task 생성에 성공함
+* TCH_SUCCESS

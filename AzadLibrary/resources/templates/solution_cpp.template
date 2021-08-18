@@ -7,12 +7,21 @@
 #include <vector>
 #include <string>
 #include <stdexcept>
+#include <new>
+
+// MLE handler
+void handler(){
+    throw std::bad_alloc();
+}
 
 // Solution function
 $ReturnType solution($ParameterArgs);
 
 // Main function
 int main(int argc, char **argv){
+
+    // MLE handler
+    std::set_new_handler(handler);
 
     // Get input and parse
     $InitParameters;
@@ -31,7 +40,7 @@ int main(int argc, char **argv){
         result = solution($SendParameters);
     }
     catch(const std::bad_alloc &e) {
-        std::cout << "Memory limit exceeded: " 
+        std::cerr << "Memory allocation failed: " 
             << e.what() << '\n';
         return $ExitCodeMLE;
     }

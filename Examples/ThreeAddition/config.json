@@ -39,7 +39,6 @@
     },
     "genscript": [
         "manual 1", "manual 2", "// manual 3",
-        "pure 123456789", "pure 12345678987654321",
         "pure 123456789", "pure 12345678987654321"
     ],
     "log": "azadlib.log",

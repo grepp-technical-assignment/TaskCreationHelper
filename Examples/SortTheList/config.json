@@ -17,7 +17,7 @@
         "memory": 1024
     },
     "solutions": {
-        "AC": ["solution.cpp"],
+        "AC": ["solution.cpp", "solution.cc"],
         "AC/TLE/MLE": ["unstablequicksort.cpp"],
         "TLE": ["slowsort.cpp"],
         "MLE": [],

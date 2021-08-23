@@ -192,15 +192,18 @@ class SourceFileLanguage(Enum):
     Enumeration of possible solution file languages.
     """
     C = "c"
-    Cpp = "cpp"
+    Cpp = ("cpp", "cc")
     Python3 = "py"
     Java = "java"
     Csharp = "cs"
+    Javascript = "js"
 
 
 def getSourceFileLanguage(extension: str) -> SourceFileLanguage:
     for lang in SourceFileLanguage:
-        if lang.value == extension:
+        if isinstance(lang.value, str) and extension == lang.value:
+            return lang
+        elif isinstance(lang.value, (tuple, list)) and extension in lang.value:
             return lang
     raise ValueError("Couldn't found language for '.%s'" % (extension,))
 

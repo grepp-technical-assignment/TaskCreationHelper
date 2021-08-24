@@ -167,30 +167,31 @@ class AzadCore:
         result = module.run(genscript[1:])
         return result
 
-    def generateInput(self) -> typing.List[Path]:
+    def generateInput(
+            self, genscripts: typing.List[typing.List[str]]) -> typing.List[Path]:
         """
         Generate all input data as file and return those files.
         If there is an error in any generation process, raise an error.
         """
-        if not self.config.genscripts:
+        if not genscripts:
             raise ValueError("There is no genscript")
         logger.info("Generating input data..")
 
         # Prepare stuffs
         results: typing.List[Const.EXOO] = \
-            [(None, None, None) for _ in self.config.genscripts]
+            [(None, None, None) for _ in genscripts]
 
         def run(index: int):
             """
             Helper function to run independent generator subprocess.
             Use this under `misc.runThreads`.
             """
-            results[index] = self.runGeneration(self.config.genscripts[index])
+            results[index] = self.runGeneration(genscripts[index])
 
         # Do multiprocessing
         timeDiff, dtDistribution = runThreads(
             run, self.concurrencyCount,
-            *[((i,), {}) for i in range(len(self.config.genscripts))],
+            *[((i,), {}) for i in range(len(genscripts))],
             funcName="Generation")
         logger.info("Finished all generation in %g seconds.", timeDiff)
         logger.debug("DT: [%s]", ", ".join(
@@ -205,19 +206,21 @@ class AzadCore:
                 with open(errLog, "r") as errorLogFile:
                     logger.error(
                         "Generation #%d failed(%s, genscript = \"%s\"); Error log:\n%s",
-                        i + 1, exitcode.name, self.config.genscripts[i],
+                        i + 1, exitcode.name, genscripts[i],
                         errorLogFile.read())
             else:  # Even if exit code is success, try parsing
                 try:
+                    logger.info("Parsing data #%d..", i + 1)
                     iterator = IOData.yieldLines(inputDataPath)
                     for varName, iovt, dimension in self.config.parameters:
-                        logger.info("Parsing data #%d: %s..", i + 1, varName)
+                        logger.debug(
+                            "Parsing data #%d: parameter '%s'..", i + 1, varName)
                         IOData.parseMulti(iterator, iovt, dimension)
                     del iterator
                     gc.collect()
                 except (StopIteration, TypeError, ValueError) as err:
                     logger.error("Error raised while parsing input data #%d (genscript = \"%s\")",
-                                 i + 1, self.config.genscripts[i])
+                                 i + 1, genscripts[i])
                     raise err.with_traceback(err.__traceback__)
 
         # Finalize
@@ -468,7 +471,35 @@ class AzadCore:
                 outFile.write(IOData.PGizeData(
                     answers[i], self.config.returnType).encode('ascii'))
 
-    def run(self, mode: Const.AzadLibraryMode):
+    def runRegularPipeline(self, produceDataOnly: bool = False):
+        """
+        Run regular pipeline.
+        """
+
+        # Go full or produce?
+        inputDataFiles = self.generateInput(self.config.genscripts)
+        self.validateInput(inputDataFiles)
+        answers = self.generateOutputs(
+            inputDataFiles, mainACOnly=produceDataOnly)
+        logger.info("Generated all answers%s.",
+                    " and validated all solutions"
+                    if not produceDataOnly else "")
+
+        # Write PGized I/O files
+        IOData.cleanIOFilePath(self.config.IOPath)
+        self.writePGInFiles(inputDataFiles)
+        self.writePGOutFiles(answers)
+        for file in inputDataFiles:
+            self.fs.pop(file)
+        logger.info("PG-transformed and wrote all data into files.")
+
+    def runStressPipeline(self, stressTestIndex: int):
+        """
+        Run stress pipeline.
+        """
+        raise NotImplementedError
+
+    def run(self, mode: Const.AzadLibraryMode, stressTestIndex: int = 0):
         """
         Execute total pipeline with given mode.
         """
@@ -482,19 +513,14 @@ class AzadCore:
             pause()
             return
 
-        # Go full or produce?
-        inputDataFiles = self.generateInput()
-        self.validateInput(inputDataFiles)
-        answers = self.generateOutputs(
-            inputDataFiles, mainACOnly=(mode is Const.AzadLibraryMode.Produce))
-        logger.info("Generated all answers%s.",
-                    " and validated all solutions"
-                    if mode is Const.AzadLibraryMode.Full else "")
+        # Produce regular pipeline
+        elif mode in (Const.AzadLibraryMode.Full, Const.AzadLibraryMode.Produce):
+            self.runRegularPipeline(
+                produceDataOnly=(mode is Const.AzadLibraryMode.Produce))
 
-        # Write PGized I/O files
-        IOData.cleanIOFilePath(self.config.IOPath)
-        self.writePGInFiles(inputDataFiles)
-        self.writePGOutFiles(answers)
-        for file in inputDataFiles:
-            self.fs.pop(file)
-        logger.info("PG-transformed and wrote all data into files.")
+        # Produce stress-testing pipeline
+        elif mode is Const.AzadLibraryMode.StressTest:
+            self.runStressPipeline(stressTestIndex)
+
+        else:
+            raise ValueError("Invalid mode '%s'" % (mode,))

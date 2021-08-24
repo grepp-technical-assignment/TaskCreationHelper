@@ -229,6 +229,14 @@ StartingConfigState = {
         "sample big random 100 0.1",
         "sample small random 100 0.2"
     ],
+    "stresses": [  # Optional
+        {
+            "genscript": "sample big random 10 0.5",
+            "timelimit": DefaultTimeLimit,
+            "count": 100,
+            "candidates": []
+        }
+    ],
     "log": "azadlib.log",  # Optional
     "iofiles": {
         "path": DefaultIOPath,
@@ -298,6 +306,7 @@ class AzadLibraryMode(Enum):
     Produce = "produce"  # Produce AC data only
     GenerateCode = "generate_code"  # Generate code for external module only
     Help = "help"  # Print help only
+    StressTest = "stress_test"  # Stress test
 
 
 class __NullSemaphoreClass:

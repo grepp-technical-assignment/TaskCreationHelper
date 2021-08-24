@@ -41,6 +41,14 @@
         "manual 1", "manual 2", "// manual 3",
         "pure 123456789", "pure 12345678987654321"
     ],
+    "stresses": [
+        {
+            "genscript": "pure 10000",
+            "timelimit": 1.0,
+            "count": 100,
+            "candidates": ["solution.py", "solution.cpp"]
+        }
+    ],
     "log": "azadlib.log",
     "iofiles": {
         "path": "IO",

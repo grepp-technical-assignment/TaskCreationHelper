@@ -15,7 +15,6 @@ logger = logging.getLogger(__name__)
 from . import constants as Const, syntax as Syntax
 from .misc import setupLoggers, isExistingFile
 from .errors import AzadError, VersionError
-from .syntax import variableNamePattern
 
 
 class TaskConfiguration:
@@ -36,6 +35,7 @@ class TaskConfiguration:
             solutions: dict = None, generators: dict = None,
             genscript: typing.List[str] = (),
             validator: Path = None,
+            stresses: typing.List[dict] = (),
             **kwargs):
 
         # Log file
@@ -107,7 +107,7 @@ class TaskConfiguration:
                 raise ValueError(
                     "Parameter name \"%s\" occurred multiple times" %
                     (varName,))
-            elif not re.fullmatch(variableNamePattern, varName):
+            elif not re.fullmatch(Syntax.variableNamePattern, varName):
                 raise SyntaxError("Invalid parameter name \"%s\"" % (varName,))
             elif not (0 <= dimension <= Const.MaxParameterDimensionAllowed):
                 raise ValueError("Invalid dimension %d in parameter %s" %
@@ -206,3 +206,38 @@ class TaskConfiguration:
         self.validator = (cwd / Path(validator)) if validator else None
         if self.validator is None:
             warnings.warn("There is no validator.")
+
+        # Stress testing
+        logger.debug("Validating stresses..")
+        self.stresses = []
+        for i, stress in enumerate(stresses):
+            if not isinstance(stress, dict):
+                raise TypeError
+            elif set(stress.keys()) != set(Const.StartingConfigState["stresses"][0].keys()):
+                raise ValueError("Stress #%d should consists of %s" % (
+                    i + 1, set(Const.StartingConfigState["stresses"][0].keys())))
+
+            try:
+                stress["genscript"] = Syntax.cleanGenscript(
+                    stress["genscript"], self.generators.keys())
+            except SyntaxError as err:
+                raise SyntaxError("Stress #%d's syntax is invalid" % (i + 1,)) \
+                    .with_traceback(err.__traceback__)
+
+            # Validates individual components
+            if stress["genscript"] is None:
+                raise ValueError(
+                    "Stress #%d's genscript is commented" % (i + 1,))
+            elif not isinstance(stress["count"], int) or stress["count"] < 0:
+                raise ValueError(
+                    "Stress #%d's count is %s" % (i + 1, stress["count"]))
+            elif not isinstance(stress["timelimit"], (int, float)) or stress["timelimit"] < 0:
+                raise ValueError(
+                    "Stress #%d's TL is %s" % (i + 1, stress["timelimit"]))
+            elif not isinstance(stress["candidates"], (list, tuple)):
+                raise TypeError
+            elif len(stress["candidates"]) <= 1:
+                raise ValueError(
+                    "There are less than 2 candidates in Stress #%d" % (i + 1,))
+
+            self.stresses.append(stress)

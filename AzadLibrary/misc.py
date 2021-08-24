@@ -201,7 +201,6 @@ def runThreads(
         -> typing.Tuple[float, typing.List[float]]:
     """
     Run multiple threads on same function but different arguments.
-    If `timeMeasureGlobal` is True, use `time.perf_counter` instead.
     """
 
     # Semaphore and execution time measure

@@ -161,6 +161,12 @@ class AzadCore:
                 logger.debug("Prepared solution \"%s\".",
                              formatPathForLog(path))
 
+    def runGeneration(self, genscript: typing.List[str]) -> Const.EXOO:
+        generatorName = genscript[0]
+        module = self.generatorModules[generatorName]
+        result = module.run(genscript[1:])
+        return result
+
     def generateInput(self) -> typing.List[Path]:
         """
         Generate all input data as file and return those files.
@@ -179,10 +185,7 @@ class AzadCore:
             Helper function to run independent generator subprocess.
             Use this under `misc.runThreads`.
             """
-            generatorName = self.config.genscripts[index][0]
-            genscript = self.config.genscripts[index][1:]
-            module = self.generatorModules[generatorName]
-            results[index] = module.run(genscript)
+            results[index] = self.runGeneration(self.config.genscripts[index])
 
         # Do multiprocessing
         timeDiff, dtDistribution = runThreads(
@@ -208,7 +211,10 @@ class AzadCore:
                 try:
                     iterator = IOData.yieldLines(inputDataPath)
                     for _0, iovt, dimension in self.config.parameters:
+                        logger.info("Parsing data #%d..", i + 1)
                         IOData.parseMulti(iterator, iovt, dimension)
+                    del iterator
+                    gc.collect()
                 except (StopIteration, TypeError, ValueError) as err:
                     logger.error("Error raised while parsing input data #%d (genscript = \"%s\")",
                                  i + 1, self.config.genscripts[i])

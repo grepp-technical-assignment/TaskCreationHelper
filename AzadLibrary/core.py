@@ -210,8 +210,8 @@ class AzadCore:
             else:  # Even if exit code is success, try parsing
                 try:
                     iterator = IOData.yieldLines(inputDataPath)
-                    for _0, iovt, dimension in self.config.parameters:
-                        logger.info("Parsing data #%d..", i + 1)
+                    for varName, iovt, dimension in self.config.parameters:
+                        logger.info("Parsing data #%d: %s..", i + 1, varName)
                         IOData.parseMulti(iterator, iovt, dimension)
                     del iterator
                     gc.collect()

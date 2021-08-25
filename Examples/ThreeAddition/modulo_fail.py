@@ -3,7 +3,8 @@ import random
 
 def solution(a: int, b: int, c: int):
 
-    if a % 101 == 1:
-        raise ValueError("mod 10000 fail")
+    mod = 101
+    if a % mod == mod - 1:
+        raise ValueError("mod %d fail" % (mod,))
 
     return a + b + c

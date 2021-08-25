@@ -59,7 +59,7 @@ if __name__ == "__main__":
         help="Specify the level of TCH execution (generate - produce - stress - full)",
         default="full")
     argParser.add_argument(
-        "-s", "--stress_index", help="Specify the index of stress", type=int, default=0)
+        "-s", "--stress_index", help="Specify the index of stress", type=int, default=None)
     argParser.add_argument(
         "-c", "--config", help="Give the path to the config.json or folder")
     argParser.add_argument(
@@ -124,6 +124,16 @@ if __name__ == "__main__":
             "stress": Const.AzadLibraryMode.StressTest,
         }[parsedResult.level]
         logger = logging.getLogger(__name__)
+
+        if mode is Const.AzadLibraryMode.StressTest and parsedResult.stress_index is None:
+            while True:
+                print("Enter stress test index:", end=' ')
+                parsedResult.stress_index = input()
+                if parsedResult.stress_index.isdigit():
+                    parsedResult.stress_index = int(parsedResult.stress_index)
+                    break
+                else:
+                    print("Please enter valid index.")
 
         try:
             Core.run(mode, stressTestIndex=parsedResult.stress_index)

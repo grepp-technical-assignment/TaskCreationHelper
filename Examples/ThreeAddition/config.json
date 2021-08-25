@@ -40,13 +40,19 @@
     "genscript": [
         "manual 1", "manual 2", "// manual 3",
         "pure 123456789", "pure 12345678987654321",
-        "pure 10000 e0895351-070f-431a-a0a6-06862f109642"
+        "pure 10000 679ddb6b-ced4-4782-bad1-1cf9da5caaf4"
     ],
     "stresses": [
         {
             "genscript": "pure 10000",
             "timelimit": 1.0,
             "count": 1000,
+            "candidates": ["solution.py", "solution.cpp", "modulo_fail.py"]
+        },
+        {
+            "genscript": "pure 10",
+            "timelimit": 1.0,
+            "count": 10,
             "candidates": ["solution.py", "solution.cpp", "modulo_fail.py"]
         }
     ],

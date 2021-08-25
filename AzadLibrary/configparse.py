@@ -217,12 +217,16 @@ class TaskConfiguration:
                 raise ValueError("Stress #%d should consists of %s" % (
                     i + 1, set(Const.StartingConfigState["stresses"][0].keys())))
 
+            # Genscript Validation
             try:
                 stress["genscript"] = Syntax.cleanGenscript(
                     stress["genscript"], self.generators.keys())
             except SyntaxError as err:
                 raise SyntaxError("Stress #%d's syntax is invalid" % (i + 1,)) \
                     .with_traceback(err.__traceback__)
+
+            # Candidate
+            stress["candidates"] = [cwd / p for p in stress["candidates"]]
 
             # Validates individual components
             if stress["genscript"] is None:
@@ -239,5 +243,9 @@ class TaskConfiguration:
             elif len(stress["candidates"]) <= 1:
                 raise ValueError(
                     "There are less than 2 candidates in Stress #%d" % (i + 1,))
+            elif any(not candidate.exists() for candidate in stress["candidates"]):
+                raise FileNotFoundError(
+                    "There is a non-existing file from candidates in Stress #%d" %
+                    (i + 1,))
 
             self.stresses.append(stress)

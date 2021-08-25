@@ -34,6 +34,9 @@ MaxParameterDimensionAllowed = 2
 DefaultGeneratorTL = 10.0
 DefaultValidatorTL = 10.0
 
+# Stress testing related
+DefaultBatchSize = 20
+
 # Log related
 DefaultLoggingFileName = "azadlib.log"
 DefaultLogFileMaxSize = 10 * (2 ** 20)  # 10MB

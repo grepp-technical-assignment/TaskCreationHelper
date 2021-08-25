@@ -11,6 +11,29 @@ import atexit
 import argparse
 import traceback
 
+
+def checkConfigFile(parsedResult: argparse.Namespace) -> Path:
+    """
+    Check configuration file and return its path.
+    """
+
+    # Check config.json file
+    configFilePath = Path(
+        parsedResult.config if parsedResult.config else os.getcwd())
+    if not configFilePath.exists():
+        raise FileNotFoundError(
+            "Given path %s not found" %
+            (configFilePath,))
+    elif configFilePath.is_file():
+        if not configFilePath.name.endswith("config.json"):
+            warnings.warn("Given file name is not config.json")
+    else:  # Given path is directory
+        configFilePath = configFilePath / "config.json"
+        if not configFilePath.exists():
+            raise FileNotFoundError("%s not found" % (configFilePath,))
+    return configFilePath
+
+
 # Main Execution
 if __name__ == "__main__":
 
@@ -33,8 +56,10 @@ if __name__ == "__main__":
         "-i", "--init", help="Initialize Problem Repository", action="store_true")
     argParser.add_argument(
         "-l", "--level",
-        help="Specify the level of TCH execution (generate - produce - full)",
+        help="Specify the level of TCH execution (generate - produce - stress - full)",
         default="full")
+    argParser.add_argument(
+        "-s", "--stress_index", help="Specify the index of stress", type=int, default=0)
     argParser.add_argument(
         "-c", "--config", help="Give the path to the config.json or folder")
     argParser.add_argument(
@@ -45,6 +70,7 @@ if __name__ == "__main__":
     parsedResult = argParser.parse_args(sys.argv[1:])
 
     # Bar line
+    from AzadLibrary import AzadCore
     from AzadLibrary.misc import barLine, pause
     print(barLine("Azad Library"))
     atexit.register(print, barLine("Azad Library Termination"))
@@ -84,35 +110,23 @@ if __name__ == "__main__":
                 statementFile.write(defaultStatementFile.read())
 
     # Actual run process
-    elif parsedResult.level in ("full", "produce", "generate"):
+    elif parsedResult.level in ("full", "produce", "generate", "stress"):
 
-        # Check config.json file
-        configFilePath = Path(
-            parsedResult.config if parsedResult.config else os.getcwd())
-        if not configFilePath.exists():
-            raise FileNotFoundError(
-                "Given path %s not found" %
-                (configFilePath,))
-        elif configFilePath.is_file():
-            if not configFilePath.name.endswith("config.json"):
-                warnings.warn("Given file name is not config.json")
-        else:  # Given path is directory
-            configFilePath = configFilePath / "config.json"
-            if not configFilePath.exists():
-                raise FileNotFoundError("%s not found" % (configFilePath,))
+        # Get configuration file path
+        configFilePath = checkConfigFile(parsedResult)
 
         # Run total pipeline
-        from AzadLibrary import AzadCore
         Core = AzadCore(configFilePath)
         mode: Const.AzadLibraryMode = {
             "full": Const.AzadLibraryMode.Full,
             "produce": Const.AzadLibraryMode.Produce,
             "generate": Const.AzadLibraryMode.GenerateCode,
+            "stress": Const.AzadLibraryMode.StressTest,
         }[parsedResult.level]
         logger = logging.getLogger(__name__)
 
         try:
-            Core.run(mode)
+            Core.run(mode, stressTestIndex=parsedResult.stress_index)
         except BaseException as err:
             if parsedResult.pause_on_err:
                 pause()

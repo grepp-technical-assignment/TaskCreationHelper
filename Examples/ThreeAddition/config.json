@@ -31,7 +31,7 @@
         "WA": ["wrong_answer.py", "wrong_answer.cpp"],
         "TLE": ["tle.py", "tle.cpp"],
         "MLE": ["mle.cpp"],
-        "FAIL": ["fail.py"]
+        "FAIL": ["fail.py", "modulo_fail.py"]
     },
     "generators": {
         "pure": "generator_pure.cpp",
@@ -39,14 +39,15 @@
     },
     "genscript": [
         "manual 1", "manual 2", "// manual 3",
-        "pure 123456789", "pure 12345678987654321"
+        "pure 123456789", "pure 12345678987654321",
+        "pure 10000 e0895351-070f-431a-a0a6-06862f109642"
     ],
     "stresses": [
         {
             "genscript": "pure 10000",
             "timelimit": 1.0,
-            "count": 100,
-            "candidates": ["solution.py", "solution.cpp"]
+            "count": 1000,
+            "candidates": ["solution.py", "solution.cpp", "modulo_fail.py"]
         }
     ],
     "log": "azadlib.log",

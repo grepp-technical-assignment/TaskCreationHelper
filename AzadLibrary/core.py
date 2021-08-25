@@ -11,6 +11,7 @@ import atexit
 import gc
 import logging
 import warnings
+import uuid
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +77,8 @@ class AzadCore:
             typing.Tuple[Const.IOVariableTypes, ...],
             typing.List[ExternalModule.AbstractExternalSolution]
         ] = {}  # {(category, ...): [module, ...]}
+        self.solutionModulesByPath: typing.Mapping[
+            Path, ExternalModule.AbstractExternalSolution] = {}
 
         # Inner attributes and flags
         self.producedAnswers = []
@@ -154,9 +157,11 @@ class AzadCore:
         for categories in self.config.solutions:
             self.solutionModules[categories] = []
             for path in self.config.solutions[categories]:
-                self.solutionModules[categories].append(getModule(
+                module = getModule(
                     path, Const.SourceFileType.Solution,
-                    "Solution '%s'" % (formatPathForLog(path),)))
+                    "Solution '%s'" % (formatPathForLog(path),))
+                self.solutionModules[categories].append(module)
+                self.solutionModulesByPath[path] = module
                 self.solutionModules[categories][-1].preparePipeline()
                 logger.debug("Prepared solution \"%s\".",
                              formatPathForLog(path))
@@ -199,6 +204,7 @@ class AzadCore:
 
         # Check if there is any failure
         failedIndices = []
+        logger.info("Parsing all data..")
         for i in range(len(results)):
             exitcode, inputDataPath, errLog = results[i]
             if exitcode is not Const.ExitCode.Success:  # Failed
@@ -210,7 +216,7 @@ class AzadCore:
                         errorLogFile.read())
             else:  # Even if exit code is success, try parsing
                 try:
-                    logger.info("Parsing data #%d..", i + 1)
+                    logger.debug("Parsing data #%d..", i + 1)
                     iterator = IOData.yieldLines(inputDataPath)
                     for varName, iovt, dimension in self.config.parameters:
                         logger.debug(
@@ -281,15 +287,19 @@ class AzadCore:
             gc.collect()
 
     def generateOutput(
-            self, module: ExternalModule.AbstractExternalSolution,
-            inputFiles: typing.List[Path],
-            intendedCategories: typing.Tuple[Const.Verdict, ...],
-            compare: bool = True, answers: typing.List[typing.Any] = (),
-            solutionName: str = "Unknown") -> typing.List[Path]:
+        self, module: ExternalModule.AbstractExternalSolution,
+        inputFiles: typing.List[Path],
+        intendedCategories: typing.Tuple[Const.Verdict, ...],
+        compare: bool = True, returnVerdicts: bool = False,
+        answers: typing.List[typing.Any] = (),
+        solutionName: str = "Unknown",
+        TL: float = None, ML: float = None) \
+            -> typing.Union[typing.List[Path], typing.List[Const.Verdict]]:
         """
         Generate output files with given solution module and input files.
         If `compare` flag is True, then it compares result
-        against given `answerFiles` and determine AC/WA.
+        against given `answers` and determine AC/WA.
+        If `raiseOnInvalidVerdict` is False, then return verdicts instead of raising errors.
         """
         if not inputFiles:
             raise ValueError("No input files given")
@@ -308,8 +318,8 @@ class AzadCore:
             """
             result[index] = module.run(
                 inputFiles[index],
-                timelimit=self.config.TL,
-                memorylimit=self.config.ML)
+                timelimit=self.config.TL if TL is None else TL,
+                memorylimit=self.config.ML if ML is None else ML)
 
         # Do multithreading
         timeDiff, dtDistribution = runThreads(
@@ -351,8 +361,15 @@ class AzadCore:
         verdictCount = {verdict: verdicts.count(verdict)
                         for verdict in Const.Verdict}
 
-        # What if verdict is wrong?
-        if not validateVerdict(verdictCount, *intendedCategories):
+        # Should return verdicts
+        if returnVerdicts:
+            for _0, outFile, errLog in result:
+                self.fs.pop(outFile)
+                self.fs.pop(errLog)
+            return verdicts
+
+        # What if verdict is wrong? Raise an error instead.
+        elif not validateVerdict(verdictCount, *intendedCategories):
 
             # Report for all wrong verdict indices
             for i in range(len(inputFiles)):
@@ -377,7 +394,6 @@ class AzadCore:
                     del errLogContent
                     gc.collect()
 
-            # Raise exception
             raise Errors.WrongSolutionFileCategory(
                 "Solution '%s' does not worked as intended(%s)." %
                 (solutionName, ",".join(str(s) for s in intendedCategories)))
@@ -418,6 +434,7 @@ class AzadCore:
                     self.config.returnType,
                     self.config.returnDimension))
                 self.fs.pop(answerFile)
+                gc.collect()
             except (ValueError, TypeError) as err:  # Produced wrong data
                 logger.error("Main solution produced wrong data on #%d", i + 1)
                 raise err.with_traceback(err.__traceback__)
@@ -440,6 +457,83 @@ class AzadCore:
         # Return answer files
         gc.collect()
         return answers
+
+    def runStressPipeline(
+            self, stressTestIndex: int,
+            batchSize: int = Const.DefaultBatchSize):
+        """
+        Run stress pipeline.
+        """
+
+        # Basic variables
+        stress: dict = self.config.stresses[stressTestIndex]
+        TL: float = stress["timelimit"]
+        totalCount: int = stress["count"]
+        modules: typing.List[ExternalModule.AbstractExternalSolution] = \
+            [self.solutionModulesByPath[path] for path in stress["candidates"]]
+        genscript: typing.List[str] = stress["genscript"]
+        AConly: typing.Tuple[Const.Verdict, ...] = (Const.Verdict.AC,)
+
+        # Generate genscripts
+        genscripts: typing.List[typing.List[str]] = \
+            [genscript[::] + [str(uuid.uuid4())] for _ in range(totalCount)]
+
+        # Run batches
+        currentIndex: int = 0
+        batchCount: int = 0
+        while currentIndex < totalCount:
+            nextIndex = min(totalCount, currentIndex + batchSize)
+            batchCount += 1
+            logger.info("Running batch #%d..", batchCount)
+
+            # Generate inputs
+            inputFiles: typing.List[Path] = self.generateInput(
+                genscripts[currentIndex:nextIndex])
+
+            # Generate answers by jury
+            answerFiles: typing.List[Path] = self.generateOutput(
+                modules[0], inputFiles, AConly, compare=False,
+                solutionName=modules[0].name, TL=TL)
+
+            # Constraint validation
+            answers = []
+            for i in range(len(answerFiles)):
+                answerFile = answerFiles[i]
+                try:
+                    answers.append(IOData.parseMulti(
+                        IOData.yieldLines(answerFile),
+                        self.config.returnType,
+                        self.config.returnDimension))
+                    self.fs.pop(answerFile)
+                    gc.collect()
+                except (ValueError, TypeError) as err:  # Produced wrong data
+                    logger.error(
+                        "Main solution produced wrong data on #%d", i + 1)
+                    raise err.with_traceback(err.__traceback__)
+            del answerFiles
+
+            # Find malicious genscripts
+            maliciousGenscripts: typing.Set[typing.Tuple[str, ...]] = set()
+            for module in modules[1:]:
+                verdicts: typing.List[Const.Verdict] = self.generateOutput(
+                    module, inputFiles, AConly, compare=True, answers=answers,
+                    solutionName=module.name, TL=TL, returnVerdicts=True)
+                for i, verdict in enumerate(verdicts):
+                    if verdict is not Const.Verdict.AC:
+                        maliciousGenscripts.add(
+                            tuple(genscripts[currentIndex + i]))
+
+            if maliciousGenscripts:
+                logger.error("Malicious genscripts found!")
+                for maliciousGenscript in maliciousGenscripts:
+                    logger.error(
+                        "\"%s\" is malicious genscript",
+                        " ".join(maliciousGenscript))
+                raise Errors.AzadError("Malicious genscripts found")
+
+            currentIndex = nextIndex
+
+        logger.info("Couldn't find any malicious genscript.")
 
     def writePGInFiles(self, inFiles: typing.List[Path]):
         """
@@ -492,12 +586,6 @@ class AzadCore:
         for file in inputDataFiles:
             self.fs.pop(file)
         logger.info("PG-transformed and wrote all data into files.")
-
-    def runStressPipeline(self, stressTestIndex: int):
-        """
-        Run stress pipeline.
-        """
-        raise NotImplementedError
 
     def run(self, mode: Const.AzadLibraryMode, stressTestIndex: int = 0):
         """

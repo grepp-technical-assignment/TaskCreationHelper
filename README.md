@@ -57,6 +57,11 @@ For each task, you should set the configuration json file to maintain whole task
 - `solutions`: List of solution files. You can label expected verdict for each solution file. You can even label multiple expected verdicts for single solution file. Check the examples to know how to do it.
 - `generators`: List of generator files. You should give a short name for each generators. That names will be used in `genscript`.
 - `genscript`: `genscript` is shorter name of "Generator Script". Put list of genscripts, then each genscript will call generators and pass arguments. For example, `generator_name arg1 arg2 ...` will call `generate([arg1, arg2, ...])` in `generator_name`'s generator file. Genscript also supports comment, which makes you can temporary disable some of genscripts.
+- `stresses`: List of stresses. You can stress-test specific genscript with noised randoms as many times as you want. Please refer to examples directory for better understanding.
+  - `genscript`: You should provide genscript for each stress. TCH will add random UUID noise based on provided genscript.
+  - `timelimit`: TL for each stress.
+  - `count`: Maximum number of tests you want to run.
+  - `candidates`: List of solutions files you want to include in each stress.
 - `log`: Log file's path. You can watch detailed logs(logged by library) in this file.
 - `iofiles`: Information of I/O data files to upload at Business Programmers platform.
   - `path`: Base path of I/O files. All I/O files will be made under this folder.
@@ -213,3 +218,8 @@ There are two types of I/O Data Protocol in TCH.
 
 - New supported language: Java.
 - Refactored temporary file system; Multiple depth is now allowed.
+- Many keywords are banned from parameter name.
+
+## v0.7
+
+- Stress testing is now supported.

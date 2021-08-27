@@ -531,6 +531,8 @@ class AzadCore:
                         " ".join(maliciousGenscript))
                 raise Errors.AzadError("Malicious genscripts found")
 
+            for inputFile in inputFiles:
+                self.fs.pop(inputFile)
             currentIndex = nextIndex
 
         logger.info("Couldn't find any malicious genscript.")

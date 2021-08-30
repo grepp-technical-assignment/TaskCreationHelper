@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 # Azad libraries
 from .. import constants as Const
 from ..filesystem import TempFileSystem
-from ..misc import isExistingFile, limitSubprocessResource
+from ..misc import isExistingFile, getLimitResourceFunction, prlimitSubprocessResource
 from ..errors import AzadError
 
 
@@ -205,15 +205,12 @@ class AbstractExternalModule:
                         args, stdin=stdin, stdout=DEVNULL, stderr=stderr,
                         cwd=cwd, encoding='ascii'
                     )
-                    resource.prlimit(
-                        P.pid, resource.RLIMIT_CPU, (timelimit, timelimit + 5))
-                    resource.prlimit(
-                        P.pid, resource.RLIMIT_RSS, (round(memorylimit), round(memorylimit * 1.5)))
+                    prlimitSubprocessResource(P.pid, timelimit, memorylimit)
                 elif sys.platform == "darwin":  # MacOS: Directly use preexec_fn
                     P = Popen(
                         args, stdin=stdin, stdout=DEVNULL, stderr=stderr,
                         cwd=cwd, encoding='ascii',
-                        preexec_fn=limitSubprocessResource(
+                        preexec_fn=getLimitResourceFunction(
                             timelimit, memorylimit)
                     )
                 else:

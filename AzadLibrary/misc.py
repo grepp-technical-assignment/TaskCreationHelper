@@ -15,6 +15,7 @@ from pathlib import Path
 import threading
 import copy
 import statistics
+import resource
 
 logger = logging.getLogger(__name__)
 
@@ -256,7 +257,7 @@ def formatPathForLog(path: Path, maxDepth: int = 3) -> str:
         str(path.relative_to(base))
 
 
-def limitSubprocessResource(TL: float, ML: float) \
+def getLimitResourceFunction(TL: float, ML: float) \
         -> typing.Callable[..., None]:
     """
     Return function which limits current process's
@@ -276,11 +277,28 @@ def limitSubprocessResource(TL: float, ML: float) \
                     resource.RLIMIT_STACK):
             try:
                 _, hardML = resource.getrlimit(rid)
-                resource.setrlimit(rid, (round(ML * 1024 ** 2), hardML))
-            except (resource.error, ValueError) as err:
+                resource.setrlimit(rid, (round(ML * (1 << 20)), hardML))
+            except (OSError, ValueError):
                 pass
 
     return func
+
+
+def prlimitSubprocessResource(pid: int, TL: float, ML: float):
+    """
+    Use prlimit directly to limit specific process's
+    soft time limit and soft memory limit.
+    """
+    _, hardTL = resource.prlimit(pid, resource.RLIMIT_CPU)
+    resource.prlimit(pid, resource.RLIMIT_CPU, (max(1, round(TL)), hardTL))
+
+    for rid in (resource.RLIMIT_AS, resource.RLIMIT_DATA,
+                resource.RLIMIT_STACK):
+        try:
+            _, hardML = resource.prlimit(pid, rid)
+            resource.prlimit(pid, rid, (round(ML * (1 << 20)), hardML))
+        except (OSError, ValueError):
+            pass
 
 
 def reportSolutionStatistics(

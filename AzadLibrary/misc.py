@@ -224,7 +224,7 @@ def runThreads(
     # Make, run, and join threads
     threads = [threading.Thread(
         target=tempFunc, args=(i,) + args, kwargs=kwargs)
-        for (i, (args, kwargs)) in zip(range(len(argss)), argss)]
+        for (i, (args, kwargs)) in enumerate(argss)]
     startTime = time.perf_counter()
     for thread in threads:
         thread.start()

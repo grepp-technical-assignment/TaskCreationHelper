@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 # Azad libraries
 from .. import constants as Const
 from ..filesystem import TempFileSystem
-from ..misc import isExistingFile, getLimitResourceFunction, prlimitSubprocessResource
+from ..misc import formatPathForLog, isExistingFile, getLimitResourceFunction, prlimitSubprocessResource
 from ..errors import AzadError
 
 
@@ -226,7 +226,9 @@ class AbstractExternalModule:
             P.kill()
         finally:  # Close file objects
             logger.debug("Executed \"%s\" with TL = %ds, ML = %gMB, exitcode = %d (%s)",
-                         P.args, timelimit, memorylimit, P.returncode, result.name)
+                         [formatPathForLog(arg) if isinstance(
+                             arg, Path) else arg for arg in P.args],
+                         timelimit, memorylimit, P.returncode, result.name)
             if stdin != DEVNULL:
                 stdin.close()
             if stderr != DEVNULL:

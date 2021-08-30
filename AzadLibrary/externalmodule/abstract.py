@@ -7,8 +7,10 @@ import typing
 from pathlib import Path
 from subprocess import Popen, DEVNULL, TimeoutExpired
 from string import Template as StringTemplate
+import sys
 import logging
 import threading
+import resource
 
 logger = logging.getLogger(__name__)
 
@@ -198,11 +200,25 @@ class AbstractExternalModule:
         # Execute
         try:
             with AbstractExternalModule.globalInvokeSemaphore:
-                P = Popen(
-                    args, stdin=stdin, stdout=DEVNULL, stderr=stderr,
-                    cwd=cwd, encoding='ascii',
-                    preexec_fn=limitSubprocessResource(timelimit, memorylimit)
-                )
+                if sys.platform == "linux":  # Linux: Use prlimit to avoid unstable preexec_fn
+                    P = Popen(
+                        args, stdin=stdin, stdout=DEVNULL, stderr=stderr,
+                        cwd=cwd, encoding='ascii'
+                    )
+                    resource.prlimit(
+                        P.pid, resource.RLIMIT_CPU, (timelimit, timelimit + 5))
+                    resource.prlimit(
+                        P.pid, resource.RLIMIT_RSS, (round(memorylimit), round(memorylimit * 1.5)))
+                elif sys.platform == "darwin":  # MacOS: Directly use preexec_fn
+                    P = Popen(
+                        args, stdin=stdin, stdout=DEVNULL, stderr=stderr,
+                        cwd=cwd, encoding='ascii',
+                        preexec_fn=limitSubprocessResource(
+                            timelimit, memorylimit)
+                    )
+                else:
+                    raise OSError("Unsupported OS %s" % (sys.platform,))
+
             exitcode = P.wait(60)  # One minute for max
             for ec in Const.ExitCode:
                 if ec.value == exitcode or ec.value + 256 == exitcode:

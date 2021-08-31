@@ -488,9 +488,10 @@ class AzadCore:
             batchCount += 1
             logger.info("Running batch #%d..", batchCount)
 
-            # Generate inputs
+            # Generate and validate inputs
             inputFiles: typing.List[Path] = self.generateInput(
                 genscripts[currentIndex:nextIndex])
+            self.validateInput(inputFiles)
 
             # Generate answers by jury
             answerFiles: typing.List[Path] = self.generateOutput(

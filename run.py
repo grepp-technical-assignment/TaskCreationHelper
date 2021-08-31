@@ -67,6 +67,8 @@ if __name__ == "__main__":
         version="TaskCreationHelper v%s" % (Const.AzadLibraryVersion,))
     argParser.add_argument(
         "-p", "--pause_on_err", help="Pause on error", action="store_true")
+    argParser.add_argument(
+        "-r", "--reduced_debug", help="Reduce amount of debugging", action="store_true")
     parsedResult = argParser.parse_args(sys.argv[1:])
 
     # Bar line
@@ -116,7 +118,9 @@ if __name__ == "__main__":
         configFilePath = checkConfigFile(parsedResult)
 
         # Run total pipeline
-        Core = AzadCore(configFilePath)
+        Core = AzadCore(
+            configFilePath,
+            logLevel=logging.INFO if parsedResult.reduced_debug else logging.NOTSET)
         mode: Const.AzadLibraryMode = {
             "full": Const.AzadLibraryMode.Full,
             "produce": Const.AzadLibraryMode.Produce,

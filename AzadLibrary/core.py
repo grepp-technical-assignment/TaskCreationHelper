@@ -35,7 +35,8 @@ class AzadCore:
     """
 
     def __init__(self, configFilename: typing.Union[str, Path],
-                 resetRootLoggerConfig: bool = True):
+                 resetRootLoggerConfig: bool = True,
+                 logLevel: int = logging.NOTSET):
 
         # Get configuration JSON
         if not isinstance(configFilename, (str, Path)):
@@ -47,6 +48,7 @@ class AzadCore:
         self.config = TaskConfiguration(
             configFilename.parent,
             resetRootLoggerConfig=resetRootLoggerConfig,
+            logLevel=logLevel,
             **parsedConfig)
 
         # Let's go

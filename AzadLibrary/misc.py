@@ -88,9 +88,11 @@ def validateVerdict(
     return bool(foundFeasibleCategories)
 
 
-def setupLoggers(mainLogFilePath: Path, replaceOldHandlers: bool,
-                 mainProcess: bool = True,
-                 noStreamHandler: bool = False):
+def setupLoggers(
+        mainLogFilePath: Path, replaceOldHandlers: bool,
+        mainProcess: bool = True,
+        noStreamHandler: bool = False,
+        logLevel: int = logging.NOTSET):
     """
     Set up loggers for Azad library.
     """
@@ -140,7 +142,7 @@ def setupLoggers(mainLogFilePath: Path, replaceOldHandlers: bool,
         rootLogger.addHandler(mainStreamHandler)
 
     # Final setup
-    rootLogger.setLevel(logging.NOTSET)
+    rootLogger.setLevel(logLevel)
 
 
 def getAvailableTasksCount() -> int:

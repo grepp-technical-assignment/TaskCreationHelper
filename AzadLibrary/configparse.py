@@ -26,6 +26,7 @@ class TaskConfiguration:
     def __init__(
             self, cwd: Path, *args,
             log: str = None, resetRootLoggerConfig: bool = True,
+            logLevel: int = logging.NOTSET,
             version: dict = None,
             name: str = None, author: str = None,
             limits: dict = None,
@@ -45,7 +46,8 @@ class TaskConfiguration:
         with open(self.logFilePath, "a") as mainLogFile:
             mainLogFile.write("\n" + "=" * 240 + "\n\n")
         setupLoggers(self.logFilePath, resetRootLoggerConfig,
-                     mainProcess=True, noStreamHandler=False)
+                     mainProcess=True, noStreamHandler=False,
+                     logLevel=logLevel)
         logger.info("Constructing configuration from given file...")
         logger.info("Basic path is '%s'", cwd)
 

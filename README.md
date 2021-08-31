@@ -9,6 +9,7 @@ I strongly recommend you to use Visual Studio Code for convenience, but you can 
 2. Input data validation: You can validate data easily. Type assertion is internally done, so you can focus customized validation only. You just have to write one function - `validate`.
 3. Execution and comparison between multiple solution files: You can label an expected verdict for each solution file, and TCH will automatically verify it.
 4. Output data generation: You don't have to generate output data explicitly. Instead, TCH will generate output data by main AC solution file.
+5. Automated stress testing: You can stress-test multiple solution files easily. Just configure stresses and TCH will create thousands(or more!) of tests and verify if all solution files works fine.
 
 All things above are possible in only one command. All dirty background jobs will be handled by TCH. You can focus on tasks itself.
 
@@ -26,7 +27,7 @@ Followings are list of unsupported operation systems.
 
 ## Programming Languages
 
-* Python 3.8.3+
+* Python 3.8+
   * autopep8, pylint (for contributing to library)
 * C++17 (with g++ available, if you want C++ in TCH)
   * C11 (with gcc available, if you want C in TCH too)
@@ -81,7 +82,7 @@ These are currently unsupported, but targetted to be supported in future.
 
 - Cross language sourcefile execution for current unsupported languages
 - `config.json` versioning
-- Customized answer checker
+- ~~Customized answer checker~~
 - Safe virtualization using Docker or something similar
 
 # Concept Details
@@ -223,3 +224,5 @@ There are two types of I/O Data Protocol in TCH.
 ## v0.7
 
 - Stress testing is now supported.
+- Added reduced debugging option to reduce size of log files.
+- In Linux, call `prlimit` instead of `preexec_fn` which is unsafe in presence of threads.

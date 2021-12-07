@@ -21,6 +21,10 @@ from .cpp import (
 )
 from .java import JavaSolution, AbstractJava
 
+from .js import (
+    JsSolution
+)
+
 _classes = {
     Const.SourceFileLanguage.Python3: {
         Const.SourceFileType.Generator: Python3Generator,
@@ -37,6 +41,9 @@ _classes = {
     },
     Const.SourceFileLanguage.Java: {
         Const.SourceFileType.Solution: JavaSolution,
+    },
+    Const.SourceFileLanguage.Javascript: {
+        Const.SourceFileType.Solution: JsSolution,
     }
 }
 

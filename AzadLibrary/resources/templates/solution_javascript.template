@@ -1,0 +1,63 @@
+/**
+ * JsIOHelperPath: tchio module path
+ * SolutionPath: solution path
+ * InitParameters: init parameters
+ * GetParameters: get parameters
+ * ExitCodeInputParsingError: exit code when input parsing error
+ * ExitCodeSolutionFailed: exit code when runtime error
+ * ExitCodeWrongTypeGenerated: exit code when output error
+ * ExitCodeSuccess: exit code when success
+ * ReturnType: return type
+ * ReturnDimension: return dimension
+ * Parameters: parameters name
+ * 
+ * [input (GetParameters)]
+ * {Param} = TCHIO.parse(input, {ParamType}, {ParamDimension});
+ */
+
+const TCHIO = require('$JsIOHelperPath');
+
+function subprocess(input) {
+    const sol = require('$SolutionPath');
+
+    $InitParameters;
+    try {
+        $GetParameters;
+    } catch (err) {
+        console.error(`Failed to parsing parameters on solution: ` + err);
+        process.exit($ExitCodeInputParsingError);
+    }
+    
+    var result;
+    try {
+        result = sol.solution($Parameters);
+    } catch (err) {
+        console.error(`Failed to run solution: ` + err);
+        process.exit($ExitCodeSolutionFailed);
+    }
+
+    return result;
+}
+
+function main() {
+    const fs = require('fs');
+    const readline = require('readline');
+    const rl = readline.createInterface({
+        input: process.stdin,
+    });
+
+    const outputStream = fs.createWriteStream(process.argv[2]);
+
+    TCHIO.read(rl, function(input) {
+        var result = subprocess(input);
+        try {
+            TCHIO.write(outputStream, result, $ReturnType, $ReturnDimension);
+            process.exit($ExitCodeSuccess);
+        } catch (err) {
+            console.error(`Failed to write result: ` + err);
+            process.exit($ExitCodeWrongTypeGenerated);
+        }
+    });
+}
+
+main();

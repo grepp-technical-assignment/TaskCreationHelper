@@ -71,7 +71,7 @@ class AbstractJs(AbstractProgrammingLanguage):
                     raise OSError(
                         "Given path(key = %s, path = %s) isn't existing file" % (key, path)
                     )
-                result[key] = path
+                result[key] = './' + removeExtension(path)
 
         # Set paths
         registerPath("JsIOHelperPath", ioHelperPath)
@@ -134,7 +134,7 @@ class JsSolution(AbstractExternalSolution, AbstractJs):
             extension="js", basePath=self.basePath
         )
         self.solutionPath = self.fs.copyFile(
-            self.solutionTemplatePath, destName="solution_javascript_template",
+            self.solutionTemplatePath, destName="solution_template_js",
             extension="js", basePath=self.basePath
         )
 
@@ -166,7 +166,7 @@ class JsSolution(AbstractExternalSolution, AbstractJs):
         # Prepare main body
         code = self.generateCode(
             self.parameterInfo, self.returnInfo,
-            self.solutionPath, self.ioHelperPath,
+            self.originalSourceCodePath, self.ioHelperPath,
         )
         self.modulePath = self.fs.newTempFile(
             content=code, name="solution_js",

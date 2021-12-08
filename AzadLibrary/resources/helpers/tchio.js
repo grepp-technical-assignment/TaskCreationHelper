@@ -3,23 +3,28 @@ function typeCheck(obj, type, dim) {
     if (dim > 0) {
         if (Array.isArray(obj)) {
             for (var i = 0; i < obj.length; i++) {
-                res &= typeCheck(obj[i], type, dim - 1);
+                typeCheck(obj[i], type, dim - 1);
                 if (dim > 1) {
                     if (obj[i].length != obj[0].length) throw new Error('typeCheck error: matrix is not square');
                 }
             }
+        } else {
+            throw new Error('typeCheck error: input dimension mismatch');
         }
-        throw new Error('typeCheck error: input dimension mismatch');
     } else {
         switch (type) {
         case 'int': case 'long':
             if (!Number.isInteger(obj)) throw new Error('typeCheck error: input is not integer');
+            break;
         case 'float':
             if (!Number.isFinite(obj)) throw new Error('typeCheck error: input is not float');
+            break;
         case 'string':
             if (!typeof obj === 'string') throw new Error('typeCheck error: input is not string');
+            break;
         case 'bool':
             if (!typeof obj === 'boolean') throw new Error('typeCheck error: input is not boolean');
+            break;
         default:
             throw new Error('typeCheck error: unknown type');
         }
@@ -56,7 +61,7 @@ function parse(input, type, dim, checkAssert = true) {
         }
         return obj;
     } else {
-        var obj = parse0d(input.shift(), type);
+        var obj = parse0d(input, type);
         if (checkAssert) {
             typeCheck(obj, type, dim);
         }
@@ -78,20 +83,23 @@ function read(rl, callback) {
     });
 }
 
+const fs = require('fs');
+
 function write(outputStream, result, type, dim, checkAssert = true) {
     if (dim < 0) throw new Error('write error: dim is negative');
     if (checkAssert) typeCheck(result, type, dim);
     if (dim > 0) {
-        outputStream.write(result.length + '\n');
+        fs.writeSync(outputStream, result.length + '\n');
         for (var i = 0; i < result.length; ++i) {
             write(outputStream, result[i], type, dim - 1, false);
         }
     } else {
-        outputStream.write(result + '\n');
+        fs.writeSync(outputStream, result + '\n');
     }
 }
 
 module.exports = {
     read,
     write,
+    parse,
 }

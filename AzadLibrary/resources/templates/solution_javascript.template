@@ -20,9 +20,9 @@ const TCHIO = require('$JsIOHelperPath');
 function subprocess(input) {
     const sol = require('$SolutionPath');
 
-    $InitParameters;
+    $InitParameters
     try {
-        $GetParameters;
+        $GetParameters
     } catch (err) {
         console.error(`Failed to parsing parameters on solution: ` + err);
         process.exit($ExitCodeInputParsingError);
@@ -46,7 +46,7 @@ function main() {
         input: process.stdin,
     });
 
-    const outputStream = fs.createWriteStream(process.argv[2]);
+    const outputStream = fs.openSync(process.argv[2], 'w');
 
     TCHIO.read(rl, function(input) {
         var result = subprocess(input);

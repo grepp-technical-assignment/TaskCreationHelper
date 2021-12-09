@@ -50,6 +50,7 @@ function main() {
 
     TCHIO.read(rl, function(input) {
         var result = subprocess(input);
+        TCHIO.assertAfterInput(input);
         try {
             TCHIO.write(outputStream, result, $ReturnType, $ReturnDimension);
             process.exit($ExitCodeSuccess);

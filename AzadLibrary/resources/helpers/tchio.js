@@ -16,7 +16,7 @@ function typeCheck(obj, type, dim) {
         case 'int': case 'long':
             if (!Number.isInteger(obj)) throw new Error('typeCheck error: input is not integer');
             break;
-        case 'float':
+        case 'float': case 'double':
             if (!Number.isFinite(obj)) throw new Error('typeCheck error: input is not float');
             break;
         case 'string':
@@ -46,12 +46,19 @@ function parse0d(obj, type) {
     }
 }
 
+var _input_idx = 0;
+
+function shift(input) {
+    if (input.length <= _input_idx) throw new Error('shift error: input is empty');
+    return input[_input_idx++];
+}
+
 function parse(input, type, dim, checkAssert = true) {
     if (dim < 0) throw new Error('parse error: dim is negative');
     if (dim > 0) {
-        var length = parse0d(input.shift(), 'int');
+        var length = parse0d(shift(input), 'int');
         var obj = [];
-        if (input.length < length) throw new Error('parse error: input is empty');
+        if (input.length < _input_idx + length) throw new Error('parse error: input is empty');
         for (var i = 0; i < length; ++i) {
             obj.push(parse(input, type, dim - 1, false));
         }
@@ -60,7 +67,7 @@ function parse(input, type, dim, checkAssert = true) {
         }
         return obj;
     } else {
-        var obj = parse0d(input.shift(), type);
+        var obj = parse0d(shift(input), type);
         if (checkAssert) {
             typeCheck(obj, type, dim);
         }
@@ -69,7 +76,7 @@ function parse(input, type, dim, checkAssert = true) {
 }
 
 function assertAfterInput(input) {
-    if (input.length > 0) throw new Error('after parse error: input is not empty');
+    if (input.length - _input_idx > 0) throw new Error('after parse error: input is not empty');
 }
 
 function read(rl, callback) {
@@ -101,4 +108,5 @@ module.exports = {
     read,
     write,
     parse,
+    assertAfterInput,
 }

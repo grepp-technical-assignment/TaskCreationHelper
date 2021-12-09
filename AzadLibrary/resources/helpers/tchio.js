@@ -47,21 +47,20 @@ function parse0d(obj, type) {
 }
 
 function parse(input, type, dim, checkAssert = true) {
-    if (input.length < 1) throw new Error('parse error: input is empty');
     if (dim < 0) throw new Error('parse error: dim is negative');
     if (dim > 0) {
         var length = parse0d(input.shift(), 'int');
         var obj = [];
         if (input.length < length) throw new Error('parse error: input is empty');
         for (var i = 0; i < length; ++i) {
-            obj.push(parse(input.shift(), type, dim - 1, false));
+            obj.push(parse(input, type, dim - 1, false));
         }
         if (checkAssert) {
             typeCheck(obj, type, dim);
         }
         return obj;
     } else {
-        var obj = parse0d(input, type);
+        var obj = parse0d(input.shift(), type);
         if (checkAssert) {
             typeCheck(obj, type, dim);
         }

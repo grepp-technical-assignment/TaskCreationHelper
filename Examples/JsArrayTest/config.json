@@ -1,0 +1,60 @@
+{
+    "name": "ArrayTest",
+    "author": "Morgan",
+    "parameters": [
+        {
+            "name": "d0",
+            "type": "long",
+            "dimension": 0
+        },
+        {
+            "name": "d1",
+            "type": "long",
+            "dimension": 1
+        },
+        {
+            "name": "d2",
+            "type": "long",
+            "dimension": 2
+        }
+    ],
+    "return": {
+        "type": "long",
+        "dimension": 0
+    },
+    "limits": {
+        "time": 5.0,
+        "memory": 1024
+    },
+    "solutions": {
+        "AC": ["solution_rn.js", "solution_py.py"],
+        "WA": [],
+        "TLE": [],
+        "MLE": [],
+        "FAIL": []
+    },
+    "generators": {
+        "random": "generator.py",
+        "manual": "generator_manual.py"
+    },
+    "genscript": [
+        "manual 1",
+        "random seed0",
+        "random seed1",
+        "random seed2",
+        "random seed3",
+        "random seed4"
+    ],
+    "log": "azadlib.log",
+    "iofiles": {
+        "path": "IO",
+        "inputsyntax": "%02d.in.txt",
+        "outputsyntax": "%02d.out.txt"
+    },
+    "validator": "",
+    "precision": 1e-06,
+    "version": {
+        "problem": 1.0,
+        "config": 1.0
+    }
+}

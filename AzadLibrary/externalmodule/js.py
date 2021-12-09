@@ -30,6 +30,7 @@ class AbstractJs(AbstractProgrammingLanguage):
     # }
 
     # Template file path
+    exportTemplatePath = Const.ResourcesPath / "templates/solution_javascript_export.template"
     solutionTemplatePath = Const.ResourcesPath / "templates/solution_javascript.template"
     ioHelperTemplatePath = Const.ResourcesPath / "helpers/tchio.js"
 
@@ -133,10 +134,6 @@ class JsSolution(AbstractExternalSolution, AbstractJs):
             self.ioHelperTemplatePath, destName="tchio",
             extension="js", basePath=self.basePath
         )
-        self.solutionPath = self.fs.copyFile(
-            self.solutionTemplatePath, destName="solution_template_js",
-            extension="js", basePath=self.basePath
-        )
 
     @classmethod
     def generateCode(cls,
@@ -163,20 +160,33 @@ class JsSolution(AbstractExternalSolution, AbstractJs):
     def preparePipeline(self):
         if self.prepared:
             raise AzadError("Already prepared")
+        # make solution export template
+        content = {}
+        with open(self.originalSourceCodePath, "r") as solutionFile:
+            content['Content'] = solutionFile.read()
+        self.prepared = True
+        solutionOuter = self.replaceSymbols(
+            self.exportTemplatePath,
+            self.templateDict(
+                **content,
+            )
+        )
+        self.exportSolutionPath = self.fs.newTempFile(
+            content=solutionOuter, name="solution_js_export",
+            extension="js", basePath=self.basePath
+        )
         # Prepare main body
+        # code = self.generateCode(
+        #     self.parameterInfo, self.returnInfo,
+        #     self.originalSourceCodePath, self.ioHelperPath,
+        # )
         code = self.generateCode(
             self.parameterInfo, self.returnInfo,
-            self.originalSourceCodePath, self.ioHelperPath,
+            self.exportSolutionPath, self.ioHelperPath,
         )
         self.modulePath = self.fs.newTempFile(
             content=code, name="solution_js",
             extension="js", basePath=self.basePath
         )
+        
         self.prepared = True
-
-    # @staticmethod
-    # def invoke(*args, **kwargs) -> Const.ExitCode:
-    #     if "memorylimit" in kwargs:
-    #         del kwargs["memorylimit"]
-    #     return super(JsSolution, JsSolution).invoke(
-    #         *args, memorylimit=2**20, **kwargs)

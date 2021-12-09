@@ -1,0 +1,7 @@
+/**
+ * Content: Javascript Solution File
+ */
+
+$Content
+
+module.exports.solution = solution;

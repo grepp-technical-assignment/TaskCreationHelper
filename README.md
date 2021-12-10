@@ -32,6 +32,7 @@ Followings are list of unsupported operation systems.
 * C++17 (with g++ available, if you want C++ in TCH)
   * C11 (with gcc available, if you want C in TCH too)
 * OpenJDK / javac 11.0.8+ (if you want Java in TCH)
+* Javascript / Node.js 12.18.3+ (if you want Javascript in TCH)
 
 # Usage
 
@@ -140,6 +141,12 @@ Source files are the files you have to write to make a task. Source files will g
           }
       }
       ```
+   - Node.js(Javascript):
+      ```javascript
+      function solution(param1, param2, ...){
+          return blabla;
+      }
+      ```
 
 ### Notes
 
@@ -221,8 +228,13 @@ There are two types of I/O Data Protocol in TCH.
 - Refactored temporary file system; Multiple depth is now allowed.
 - Many keywords are banned from parameter name.
 
-## v0.7
+## v0.7(v1.0)
 
 - Stress testing is now supported.
 - Added reduced debugging option to reduce size of log files.
 - In Linux, call `prlimit` instead of `preexec_fn` which is unsafe in presence of threads.
+
+## v1.1
+
+- New supported language: Node.js(Javascript).
+- Now TCH can set the environment with a docker. (Beta - Node is not supported yet)

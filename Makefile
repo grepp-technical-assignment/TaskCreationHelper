@@ -3,18 +3,38 @@ CONTAINER_NAME ?= TCH
 VOLUME ?= $(PWD):/TCH/VOLUME
 VERSION = $(shell python3 run.py --version | grep -o -E v.+)
 
-CC = docker
+DOCKER = docker
+DANGLING_IMAGE = $(shell $(DOCKER) images -f dangling=true -q)
+LATEST_TCH_IMAGE = $(shell $(DOCKER) images --filter=reference="tch" -q)
 
-.PHONY: buld version test
+.PHONY: buld version test clean
 
 build:
-	$(CC) build -t $(IMAGE_NAME):$(VERSION) ./
+ifneq ($(LATEST_TCH_IMAGE),)
+	$(DOCKER) rmi -f $(LATEST_TCH_IMAGE)
+endif
+
+	$(DOCKER) build -t $(IMAGE_NAME):$(VERSION) ./
+	$(DOCKER) tag $(IMAGE_NAME):$(VERSION) $(IMAGE_NAME):latest
+
+ifneq ($(DANGLING_IMAGE),)
+	$(DOCKER) rmi $(DANGLING_IMAGE)
+endif
 
 test:
-	$(CC) run --name $(CONTAINER_NAME) -v $(VOLUME) -it --rm $(IMAGE_NAME):$(VERSION) -l full -c VOLUME/Examples/SortTheList/
+	$(DOCKER) run --name $(CONTAINER_NAME) -v $(VOLUME) -it --rm $(IMAGE_NAME):$(VERSION) -l full -c VOLUME/Examples/SortTheList/
 
 run:
-	$(CC) run --name $(CONTAINER_NAME) -v $(VOLUME) -it --rm $(IMAGE_NAME):$(VERSION) $(ARGS)
+	$(DOCKER) run --name $(CONTAINER_NAME) -v $(VOLUME) -it --rm $(IMAGE_NAME):$(VERSION) $(ARGS)
 
 version:
 	@echo $(VERSION)
+
+clean:
+ifneq ($(LATEST_TCH_IMAGE),)
+	$(DOCKER) rmi -f $(LATEST_TCH_IMAGE)
+endif
+
+ifneq ($(DANGLING_IMAGE),)
+	$(DOCKER) rmi $(DANGLING_IMAGE)
+endif

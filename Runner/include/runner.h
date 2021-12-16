@@ -5,9 +5,9 @@
 #include <unistd.h>
 #include <stdio.h>
 
+#include "rnutil.h"
 #include "rntype.h"
 #include "rnsys.h"
-#include "util.h"
 
 #define RUNNER_VERSION "v0.1.0"
 

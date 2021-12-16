@@ -1,4 +1,4 @@
-#include "util.h"
+#include "rnutil.h"
 
 /**
  * @brief Check if system function is supported
@@ -27,6 +27,21 @@ VOID STDCALL check_docker() {
         exit(EXIT_FAILURE);
     }
 }
+
+/**
+ * @brief check if docker daemon is running
+ * 
+ * Exit if not running
+ * 
+ * @return VOID 
+ */
+VOID STDCALL check_docker_daemon() {
+    if (SYSTEM("docker images > /dev/null 2>&1")) {
+        printf("tch: docker daemon is not running\n");
+        exit(EXIT_FAILURE);
+    }
+}
+
 
 /**
  * @brief Check dir is exist or not

@@ -17,6 +17,7 @@ int main(int argc, char** argv) {
     // check system & docker //
     check_system_function();
     check_docker();
+    check_docker_daemon();
     // TODO: check docker images is installed
 
     // parse arguments //

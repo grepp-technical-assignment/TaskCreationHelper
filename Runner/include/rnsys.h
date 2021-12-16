@@ -1,6 +1,8 @@
 #ifndef __RNSYS_H__
 #define __RNSYS_H__
 
+#include <stdlib.h>
+
 /**
  * [os list]
  *  __linux__       Defined on Linux

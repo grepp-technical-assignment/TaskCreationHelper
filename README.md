@@ -87,7 +87,7 @@ You can run TCH with following two command.
 
 ## Install TCH Runner (Optional)
 
-[This project](./Runner/README.md) is a simple runner for TCH in command line interface. 
+[This project](./Runner/) is a simple runner for TCH in command line interface. 
 I strongly recommend using this.
 
 # Usage

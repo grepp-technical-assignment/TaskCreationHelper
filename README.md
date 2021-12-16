@@ -34,6 +34,62 @@ Followings are list of unsupported operation systems.
 * OpenJDK / javac 11.0.8+ (if you want Java in TCH)
 * Javascript / Node.js 12.18.3+ (if you want Javascript in TCH)
 
+# Environment Setup With Docker
+
+## Dependencies
+
+* docker
+* make
+
+## Build Docker Image
+
+You can build docker image with following command.
+
+~~~shell
+ $ make build
+~~~
+
+## Build Docker Image
+
+You can erase docker image with following command.
+
+~~~shell
+ $ make clean
+~~~
+
+## Simple run test
+
+You can test with following command. this command will run `Examples/SortTheList/` with `-l full` option.
+
+~~~shell
+ $ make test
+~~~
+
+## Run
+
+You can run TCH with following two command.
+
+~~~shell
+# Using make
+
+ $ make run VOLUME="{TCH_PROJECT_PATH}:TCH_VOLUME" ARGS="{TCH_ARGUMENTS} -c VOLUME/{SUB_PATH}"
+ $ make run VOLUME="$(PWD):/TCH/VOLUME" ARGS="-l full -c VOLUME/Examples/SortTheList/config.json"
+ $ make run VOLUME="/Users/..../TaskCreationHelper/Examples/SortTheList:/TCH/VOLUME" ARGS="-l full -c VOLUME/config.json"
+~~~
+
+~~~shell
+# Using docker command
+
+ $ docker run --name TCH -v {TCH_PROJECT_PATH}:/TCH/VOLUME --rm -it tch:latest {TCH_ARGUMENTS} -c VOLUME/{SUB_PATH}
+ $ docker run --name TCH -v $(PWD):/TCH/VOLUME --rm -it tch:latest -l full -c VOLUME/Examples/SortTheList/config.json
+ $ docker run --name TCH -v /Users/..../TaskCreationHelper/Examples/SortTheList:/TCH/VOLUME --rm -it tch:latest -l full -c VOLUME/config.json
+~~~
+
+## Install TCH Runner (Optional)
+
+[This project](./Runner/README.md) is a simple runner for TCH in command line interface. 
+I strongly recommend using this.
+
 # Usage
 
 ## Run: `run.py`

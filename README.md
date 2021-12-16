@@ -49,7 +49,7 @@ You can build docker image with following command.
  $ make build
 ~~~
 
-## Build Docker Image
+## Erase Docker Image
 
 You can erase docker image with following command.
 

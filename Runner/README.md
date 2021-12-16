@@ -18,7 +18,7 @@ This project is a simple runner for TCH in command line interface.
 
 * TaskCreationHelper's docker image
 
-## Usage
+# Usage
 
 ## Installation
 

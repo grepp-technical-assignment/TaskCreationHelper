@@ -22,7 +22,7 @@ This project is a simple runner for TCH in command line interface.
 
 ## Installation
 
-Enter this command to install tch runner
+Enter this command to install tch runner.
 
 ~~~shell
  $ make install
@@ -30,7 +30,7 @@ Enter this command to install tch runner
 
 ## Uninstallation
 
-Enter this command to uninstall tch runner
+Enter this command to uninstall tch runner.
 
 ~~~shell
  $ make uninstall
@@ -38,13 +38,13 @@ Enter this command to uninstall tch runner
 
 ## Run
 
-Enter this command on termianl to learn usage
+Enter this command on termianl to learn usage.
 
 ~~~shell
  $ tch --help
 ~~~
 
-You can use TCH Runner like this
+You can use TCH Runner like this.
 
 ~~~shell
  $ tch /Users/..../Example/SortTheList/config.json

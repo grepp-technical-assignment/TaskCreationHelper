@@ -236,5 +236,5 @@ There are two types of I/O Data Protocol in TCH.
 
 ## v1.1
 
-- New supported language: Node.js(Javascript).
-- Now TCH can set the environment with a docker. (Beta - Node is not supported yet)
+- New supported language: Node.js(Javascript). (WSL, Linux is not supported yet)
+- Now TCH can set the environment with a docker. (Node is not supported yet)

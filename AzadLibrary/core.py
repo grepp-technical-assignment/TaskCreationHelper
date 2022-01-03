@@ -292,16 +292,16 @@ class AzadCore:
         self, module: ExternalModule.AbstractExternalSolution,
         inputFiles: typing.List[Path],
         intendedCategories: typing.Tuple[Const.Verdict, ...],
-        compare: bool = True, returnVerdicts: bool = False,
+        compare: bool = True, returnVerdicts: bool = False, raiseOnInvalidVerdict: bool = True,
         answers: typing.List[typing.Any] = (),
         solutionName: str = "Unknown",
         TL: float = None, ML: float = None) \
-            -> typing.Union[typing.List[Path], typing.List[Const.Verdict]]:
+            -> typing.Union[typing.List[Path], typing.List[Const.Verdict], typing.List[typing.Tuple[Const.Verdict, Path]]]:
         """
         Generate output files with given solution module and input files.
         If `compare` flag is True, then it compares result
         against given `answers` and determine AC/WA.
-        If `raiseOnInvalidVerdict` is False, then return verdicts instead of raising errors.
+        If `raiseOnInvalidVerdict` is False, then return List of Tuples(Verdict, Path).
         """
         if not inputFiles:
             raise ValueError("No input files given")
@@ -371,7 +371,7 @@ class AzadCore:
             return verdicts
 
         # What if verdict is wrong? Raise an error instead.
-        elif not validateVerdict(verdictCount, *intendedCategories):
+        elif raiseOnInvalidVerdict and not validateVerdict(verdictCount, *intendedCategories):
 
             # Report for all wrong verdict indices
             for i in range(len(inputFiles)):
@@ -405,7 +405,8 @@ class AzadCore:
             for _0, _1, errLog in result:
                 self.fs.pop(errLog)
             gc.collect()
-            return [outfilePath for (_0, outfilePath, _2) in result]
+            return [outfilePath for (_0, outfilePath, _2) in result] if raiseOnInvalidVerdict \
+                else [(verdicts[i], result[i][1]) for i in range(len(inputFiles))]
 
     def generateOutputs(self, inputFiles: typing.List[Path],
                         mainACOnly: bool = True) -> list:
@@ -570,6 +571,20 @@ class AzadCore:
                 outFile.write(IOData.PGizeData(
                     answers[i], self.config.returnType).encode('ascii'))
 
+    def writePGInvocationFiles(self, results: list, solutionIndex: int):
+        """
+        Convert results into PGized form into `self.config.invocationPath`/`solutionIndex`
+        """
+        logger.info("Writing PGized Invocation files for solution %d.." % solutionIndex)
+
+        for i in range(len(results)):
+            if not results[i]: continue # Skips TLE/MLE/FAIL
+            outPath = self.config.invocationPath / str(solutionIndex) / (self.config.outputFilePathSyntax % (i + 1,))
+            logger.debug("Writing '%s'..", formatPathForLog(outPath))
+            with open(outPath, "wb") as outFile:
+                outFile.write(IOData.PGizeData(
+                    results[i], self.config.returnType).encode('ascii'))
+
     def runRegularPipeline(self, produceDataOnly: bool = False):
         """
         Run regular pipeline.
@@ -591,6 +606,140 @@ class AzadCore:
         for file in inputDataFiles:
             self.fs.pop(file)
         logger.info("PG-transformed and wrote all data into files.")
+    
+    def runInvocationPipeline(self):
+        """
+        Run Invocation pipeline.
+        """
+        
+        inputFiles = self.generateInput(self.config.genscripts)
+        self.validateInput(inputFiles)
+        #answers = self.generateOutputs(
+        #    inputDataFiles, mainACOnly=False)
+        #logger.info("Generated answers for all solutions")
+
+        # Run main AC first
+        logger.info("Generating outputs for main AC")
+        AConly: typing.Tuple[Const.Verdict, ...] = (Const.Verdict.AC,)
+        mainACModule: ExternalModule.AbstractExternalSolution = \
+            self.solutionModules[AConly][0]
+        answerFiles: typing.List[Path] = self.generateOutput(
+            mainACModule, inputFiles, AConly, compare=False,
+            solutionName="MAIN (%s)" %
+            (formatPathForLog(self.config.solutions[AConly][0]),))
+
+        # Constraint validation
+        answers = []
+        for i in range(len(answerFiles)):
+            answerFile = answerFiles[i]
+            try:
+                answers.append(IOData.parseMulti(
+                    IOData.yieldLines(answerFile),
+                    self.config.returnType,
+                    self.config.returnDimension))
+                self.fs.pop(answerFile)
+                gc.collect()
+            except (ValueError, TypeError) as err:  # Produced wrong data
+                logger.error("Main solution produced wrong data on #%d", i + 1)
+                raise err.with_traceback(err.__traceback__)
+        del answerFiles
+
+        # Run all other solution files
+        results = []
+        verdicts = []
+        solutionIndex = -1
+        for category in self.solutionModules:
+            for i in range(len(self.solutionModules[category])):
+                module = self.solutionModules[category][i]
+                if module is mainACModule:
+                    continue
+                solutionIndex += 1
+                results.append([])
+                verdicts.append([])
+                result = self.generateOutput(
+                    module, inputFiles, category, answers=answers, raiseOnInvalidVerdict=False,
+                    solutionName=formatPathForLog(self.config.solutions[category][i]))
+                for j in range(len(result)):
+                    verdict, outfilePath = result[j]
+                    verdicts[solutionIndex].append(verdict)
+                    if verdict == Const.Verdict.AC or verdict == Const.Verdict.WA:
+                        try:
+                            results[solutionIndex].append(IOData.parseMulti(
+                                IOData.yieldLines(outfilePath),
+                                self.config.returnType,
+                                self.config.returnDimension))
+                            gc.collect()
+                        except (ValueError, TypeError) as err:  # This should not happen
+                            logger.error("Candidate Solution %d produced wrong data on #%d", solutionIndex + 2, j + 1)
+                            raise err.with_traceback(err.__traceback__)
+                    else:
+                        results[solutionIndex].append(None)
+                    self.fs.pop(outfilePath)
+                gc.collect()
+
+        gc.collect()
+
+        # Write PGized I/O files (main AC solution)
+        IOData.cleanIOFilePath(self.config.IOPath)
+        self.writePGInFiles(inputFiles)
+        self.writePGOutFiles(answers)
+        for file in inputFiles:
+            self.fs.pop(file)
+
+        # Write PGized Out files (other solutions)
+        solutionIndex = -1
+        for category in self.solutionModules:
+            for i in range(len(self.solutionModules[category])):
+                module = self.solutionModules[category][i]
+                if module is mainACModule:
+                    continue
+                solutionIndex += 1
+                if not (self.config.invocationPath / str(solutionIndex + 1)).exists():
+                    (self.config.invocationPath / str(solutionIndex + 1)).mkdir()
+                IOData.cleanIOFilePath(self.config.invocationPath / str(solutionIndex + 1))
+                self.writePGInvocationFiles(results[solutionIndex], solutionIndex=solutionIndex + 1)
+
+        logger.info("PG-transformed and wrote all data into files.")
+
+        # Lets make report.md
+        with open(self.config.invocationPath / "Invocation.md", "w") as invocationFile:
+            tmp = []
+
+            # Link solution files
+            tmp.append("|#| ")
+            for category in self.solutionModules:
+                for i in range(len(self.solutionModules[category])):
+                    module = self.solutionModules[category][i]
+                    tmp.append("[%s](%s%s%s)|" % \
+                        ("Main AC Solution" if module is mainACModule else formatPathForLog(self.config.solutions[category][i], maxDepth=1)[3:], 
+                        self.config.pathPrefix, 
+                        self.config.solutions[category][i], 
+                        self.config.pathSuffix))
+            tmp.append("\n|-|")
+
+            # Bar Line
+            for j in range(len(results)+1):
+                tmp.append("-|")
+            
+            # Link IO files
+            for i in range(len(inputFiles)):
+                tmp.append("\n|[%d](%s%s%s)|" % \
+                    (i + 1,
+                    self.config.pathPrefix, 
+                    str(self.config.IOPath / (self.config.inputFilePathSyntax % (i + 1,))), 
+                    self.config.pathSuffix))
+                tmp.append("[AC](%s%s%s)|" % \
+                    (self.config.pathPrefix, 
+                    str(self.config.IOPath / (self.config.outputFilePathSyntax % (i + 1,))), 
+                    self.config.pathSuffix))
+                for j in range(len(verdicts)):
+                    tmp.append("[%s](%s%s%s)|" % \
+                        (verdicts[j][i].value if verdicts[j][i] == Const.Verdict.AC else ("__**%s**__" % verdicts[j][i].value),
+                        self.config.pathPrefix, 
+                        str(self.config.invocationPath / str(j+1) / (self.config.outputFilePathSyntax % (i + 1,))), 
+                        self.config.pathSuffix))
+            invocationFile.write(''.join(tmp))
+
 
     def run(self, mode: Const.AzadLibraryMode, stressTestIndex: int = 0):
         """
@@ -614,6 +763,10 @@ class AzadCore:
         # Produce stress-testing pipeline
         elif mode is Const.AzadLibraryMode.StressTest:
             self.runStressPipeline(stressTestIndex)
+        
+        # Produce invocating pipeline
+        elif mode is Const.AzadLibraryMode.Invocate:
+            self.runInvocationPipeline()
 
         else:
             raise ValueError("Invalid mode '%s'" % (mode,))

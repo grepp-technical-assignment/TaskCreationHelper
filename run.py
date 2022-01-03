@@ -56,7 +56,7 @@ if __name__ == "__main__":
         "-i", "--init", help="Initialize Problem Repository", action="store_true")
     argParser.add_argument(
         "-l", "--level",
-        help="Specify the level of TCH execution (generate - produce - stress - full)",
+        help="Specify the level of TCH execution (generate - produce - stress - full - invocate)",
         default="full")
     argParser.add_argument(
         "-s", "--stress_index", help="Specify the index of stress", type=int, default=None)
@@ -110,13 +110,13 @@ if __name__ == "__main__":
             with open(Const.ResourcesPath / "etc/default_statement.md", "r") \
                     as defaultStatementFile:
                 statementFile.write(defaultStatementFile.read())
-
+    
     # Actual run process
-    elif parsedResult.level in ("full", "produce", "generate", "stress"):
+    elif parsedResult.level in ("full", "produce", "generate", "stress", "invocate"):
 
         # Get configuration file path
         configFilePath = checkConfigFile(parsedResult)
-
+        
         # Run total pipeline
         Core = AzadCore(
             configFilePath,
@@ -126,9 +126,10 @@ if __name__ == "__main__":
             "produce": Const.AzadLibraryMode.Produce,
             "generate": Const.AzadLibraryMode.GenerateCode,
             "stress": Const.AzadLibraryMode.StressTest,
+            "invocate": Const.AzadLibraryMode.Invocate
         }[parsedResult.level]
         logger = logging.getLogger(__name__)
-
+        
         if mode is Const.AzadLibraryMode.StressTest and parsedResult.stress_index is None:
             while True:
                 print("Enter stress test index:", end=' ')
@@ -138,7 +139,7 @@ if __name__ == "__main__":
                     break
                 else:
                     print("Please enter valid index.")
-
+        
         try:
             Core.run(mode, stressTestIndex=parsedResult.stress_index)
         except BaseException as err:

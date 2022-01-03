@@ -135,10 +135,16 @@ class TaskConfiguration:
             if not isinstance(iofiles, dict):
                 raise TypeError
             self.IOPath: Path = cwd / iofiles["path"]
+            self.invocationPath: Path = cwd / iofiles["invocationPath"]
+            self.pathPrefix = iofiles["pathPrefix"]
+            self.pathSuffix = iofiles["pathSuffix"]
             self.inputFilePathSyntax = iofiles["inputsyntax"]
             self.outputFilePathSyntax = iofiles["outputsyntax"]
         except (TypeError, KeyError):
             self.IOPath: Path = cwd / Const.DefaultIOPath
+            self.invocationPath: Path = cwd / Const.DefaultInvocationPath
+            self.pathPrefix = Const.DefaultPathPrefix
+            self.pathSuffix = Const.DefaultPathSuffix
             self.inputFilePathSyntax = Const.DefaultInputSyntax
             self.outputFilePathSyntax = Const.DefaultOutputSyntax
         if not self.IOPath.exists():
@@ -149,6 +155,10 @@ class TaskConfiguration:
             raise SyntaxError
         elif not Syntax.outputFilePattern.fullmatch(self.outputFilePathSyntax):
             raise SyntaxError
+        if not self.invocationPath.exists():
+            self.invocationPath.mkdir()
+        elif tuple(self.invocationPath.iterdir()):
+            warnings.warn("Given invocationPath '%s' is not empty" % (self.IOPath,))
 
         # Solution files
         logger.debug("Validating solution files..")

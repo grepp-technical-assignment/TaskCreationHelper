@@ -701,7 +701,8 @@ class AzadCore:
         # Lets make report.md
         with open(self.config.invocationPath / "Invocation.md", "w") as invocationFile:
             tmp = []
-
+            passedTests = [0 for i in range(len(results))]
+            
             # Link solution files
             tmp.append("|#| ")
             for category in self.solutionModules:
@@ -730,11 +731,18 @@ class AzadCore:
                     str(self.config.IOPath / (self.config.outputFilePathSyntax % (i + 1,))), 
                     self.config.pathSuffix))
                 for j in range(len(verdicts)):
+                    if verdicts[j][i] == Const.Verdict.AC:
+                        passedTests[j] += 1
                     tmp.append("[%s](%s%s%s)|" % \
                         (verdicts[j][i].value if verdicts[j][i] == Const.Verdict.AC else ("__**%s**__" % verdicts[j][i].value),
                         self.config.pathPrefix, 
                         str(self.config.invocationPath / str(j+1) / (self.config.outputFilePathSyntax % (i + 1,))), 
                         self.config.pathSuffix))
+            
+            # Passed Tests
+            tmp.append("\n|Passed Tests|%d/%d|" % (len(inputFiles), len(inputFiles)) )
+            for ACCount in passedTests:
+                tmp.append("%d/%d|" % (ACCount, len(inputFiles)))
             invocationFile.write(''.join(tmp))
 
 

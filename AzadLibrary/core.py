@@ -614,9 +614,6 @@ class AzadCore:
         
         inputFiles = self.generateInput(self.config.genscripts)
         self.validateInput(inputFiles)
-        #answers = self.generateOutputs(
-        #    inputDataFiles, mainACOnly=False)
-        #logger.info("Generated answers for all solutions")
 
         # Run main AC first
         logger.info("Generating outputs for main AC")

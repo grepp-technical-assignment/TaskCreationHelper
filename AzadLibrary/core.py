@@ -699,7 +699,7 @@ class AzadCore:
         logger.info("PG-transformed and wrote all data into files.")
 
         # Lets make report.md
-        with open(self.config.invocationPath / "Invocation.md", "w") as invocationFile:
+        with open(self.config.invocationPath / "_Invocation.md", "w") as invocationFile:
             tmp = []
             passedTests = [0 for i in range(len(results))]
             

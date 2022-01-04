@@ -158,7 +158,7 @@ class TaskConfiguration:
         if not self.invocationPath.exists():
             self.invocationPath.mkdir()
         elif tuple(self.invocationPath.iterdir()):
-            warnings.warn("Given invocationPath '%s' is not empty" % (self.IOPath,))
+            warnings.warn("Given invocationPath '%s' is not empty" % (self.invocationPath,))
 
         # Solution files
         logger.debug("Validating solution files..")

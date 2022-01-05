@@ -42,9 +42,11 @@ function drawResult() {
         return res;
     }
     function appendChildren(parent, children) {
+        var frag = new DocumentFragment();
         for (var i = 0; i < children.length; ++i) {
-            parent.appendChild(children[i]);
+            frag.appendChild(children[i]);
         }
+        parent.appendChild(frag);
     }
     function tokenize(txt) {
         var reg = /,|\s|\[|\]/g;

@@ -17,6 +17,7 @@
         "memory": 1024
     },
     "solutions": {
+        "WA": ["solution_random_wa.cpp"],
         "AC": ["solution.cpp", "solution.cc"],
         "AC/TLE/MLE": ["unstablequicksort.cpp"],
         "TLE": ["slowsort.cpp"],

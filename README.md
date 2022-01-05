@@ -123,6 +123,7 @@ For each task, you should set the configuration json file to maintain whole task
 - `log`: Log file's path. You can watch detailed logs(logged by library) in this file.
 - `iofiles`: Information of I/O data files to upload at Business Programmers platform.
   - `path`: Base path of I/O files. All I/O files will be made under this folder.
+  - `invocationPath`: Path of invocation file. Report file will be generated in this folder.
   - `inputsyntax`: Syntax of name of input files. Should contain "%d" or similar.
   - `outputsyntax`: Syntax of name of output files. Should contain "%d" or similar.
 - `validator`: Validator file. It's ok to leave this as blank(then TCH will execute solutions without validating generated input data), but I strongly recommend to make one.
@@ -294,3 +295,7 @@ There are two types of I/O Data Protocol in TCH.
 
 - New supported language: Node.js(Javascript). (WSL, Linux is not supported yet)
 - Now TCH can set the environment with a docker. (Node is not supported yet)
+
+## v1.2
+
+- Now TCH supports reporting.

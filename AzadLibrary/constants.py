@@ -15,7 +15,7 @@ import signal
 
 
 # Azad Library Version
-AzadLibraryVersion = "1.1.1"
+AzadLibraryVersion = "1.2.0"
 
 # Extra constraints
 MinimumPythonVersion = (3, 8, 0)

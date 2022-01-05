@@ -753,7 +753,7 @@ class AzadCore:
                                     IOData.PGizeData(answers[j], self.config.returnType)
                                 )
                             )
-                    
+                    logger.debug("Writing detail page...")
                     # copy detail page
                     with open(self.config.invocationPath / \
                         str(solutionIndex + 1) / \
@@ -762,6 +762,7 @@ class AzadCore:
                         dest.write(detailPageTemplate.substitute({"index": str(j + 1)}))
         
         # copy main page
+        logger.debug("Writing report page files...")
         with open(reportPath / "report.html", "r") as src:
             with open(self.config.invocationPath / "report.html", "w") as dest:
                 dest.write(src.read())

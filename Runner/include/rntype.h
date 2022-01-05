@@ -25,6 +25,7 @@ enum level_t {
     PRODUCE,
     STRESS,
     FULL,
+    INVOCATE,
 };
 
 static LPCSTR level_t_name[] = {
@@ -32,6 +33,7 @@ static LPCSTR level_t_name[] = {
     "produce",
     "stress",
     "full",
+    "invocate",
 };
 
 #endif // __RNLIB_H__

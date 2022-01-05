@@ -65,3 +65,7 @@ You can use TCH Runner like this.
 ## v0.1
 
 * First version of TCH Runner.
+
+## v0.2
+
+* Add invocation level option.

@@ -11,7 +11,7 @@ VOID STDCALL print_usage() {
     printf("optional arguments:\n");
     printf("%-24s%s", "  -h, --help", "Show this help message\n");
     printf("%-24s%s", "  -v, --version", "Show the version of tch runner & TCH\n");
-    printf("%s\n%-24s%s", "  -l LEVEL, --level LEVEL", "", "Specify the level of TCH execution (generate - produce - stress - full) [default LEVEL = full]\n");
+    printf("%s\n%-24s%s", "  -l LEVEL, --level LEVEL", "", "Specify the level of TCH execution (generate - produce - stress - full - invocate) [default LEVEL = full]\n");
     printf("%s\n%-24s%s", "  -s STRESS_INDEX, --stress_index STRESS_INDEX", "", "Specify the index of stress\n");
     printf("%-24s%s", "  -p, --pause_on_err", "Pause on error\n");
     printf("%-24s%s", "  -r, --reduced_debug", "Reduce amount of debugging\n");
@@ -67,6 +67,8 @@ VOID STDCALL parse_args(struct config_t* config, int argc, char** argv) {
                         config->level = STRESS;
                     } else if (strcmp(argv[i + 1], "full") == 0) {
                         config->level = FULL;
+                    } else if (strcmp(argv[i + 1], "invocate") == 0) {
+                        config->level = INVOCATE;
                     } else {
                         printf("tch: unknown level\n");
                         exit(EXIT_FAILURE);

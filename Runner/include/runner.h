@@ -9,7 +9,7 @@
 #include "rntype.h"
 #include "rnsys.h"
 
-#define RUNNER_VERSION "v0.1.0"
+#define RUNNER_VERSION "v0.2.0"
 
 #define CONFIG_FILE "config.json"
 

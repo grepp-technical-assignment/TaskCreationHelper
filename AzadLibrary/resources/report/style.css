@@ -1,0 +1,66 @@
+html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    position: absolute;
+}
+#app {
+    width: 100%;
+    height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    position: absolute;
+}
+#logo {
+    cursor: pointer;
+}
+.tch-header {
+    width: 100%;
+    padding: 0 22px;
+    box-sizing: border-box;
+}
+.tch-content {
+    width: 100%;
+    padding: 0 22px;
+    margin-top: 40px;
+    box-sizing: border-box;
+}
+#tch-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+#tch-table td, #tch-table th {
+    height: 40px;
+    padding: 8px 10px;
+    box-sizing: border-box;
+    border: 1px solid rgb(221, 221, 221);
+}
+#tch-table td:nth-child(1) {
+    width: 80px;
+}
+#tch-table th {
+    text-align: left;
+}
+#tch-table tbody tr:nth-child(2n - 1) {
+    background-color: rgb(249, 249, 249);
+}
+.clickable {
+    cursor: pointer;
+}
+.clickable:hover {
+    text-decoration: underline;
+}
+.tch-data-form {
+    width: 100%;
+    padding: 15px 28px;
+    box-sizing: border-box;
+    background-color: rgb(249, 249, 249);
+}
+.tch-correct {
+    background-color: rgb(199, 255, 176);
+}
+.tch-wrong {
+    background-color: rgb(255, 172, 139);
+}

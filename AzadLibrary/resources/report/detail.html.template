@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../style.css">
+    <script src="tc$index.js"></script>
+    <title>TCH Report</title>
+</head>
+<body>
+<div id="app">
+    <script src="../detail.js"></script>
+    <div class="tch-header">
+        <h1 id="logo">TCH Report</h1>
+        <span>Report Version 0.1</span>
+    </div>
+    <div class="tch-content">
+        <h2 id="tch-result"></h2>
+
+        <h3>Compressed Data (less than 100 letters)</h3>
+        <div class="tch-data-form" id="tch-cp-data"></div>
+
+        
+        <h3>Conflict Data</h3>
+        <button id="tch-cf-btn">View All Conflict Data</button>
+        <div class="tch-data-form" id="tch-cf-data" style="display: none;"></div>
+
+        <h3>Raw Data</h3>
+        <button id="tch-raw-btn">View Raw Data (Draw All Data)</button>
+        <div class="tch-data-form" id="tch-raw-data" style="display: none;"></div>
+    </div>
+</div>
+</body>
+</html>

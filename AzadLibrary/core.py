@@ -12,6 +12,7 @@ import gc
 import logging
 import warnings
 import uuid
+from string import Template as StringTemplate
 
 logger = logging.getLogger(__name__)
 
@@ -296,12 +297,12 @@ class AzadCore:
         answers: typing.List[typing.Any] = (),
         solutionName: str = "Unknown",
         TL: float = None, ML: float = None) \
-            -> typing.Union[typing.List[Path], typing.List[Const.Verdict], typing.List[typing.Tuple[Const.Verdict, Path]]]:
+            -> typing.Union[typing.List[Path], typing.List[Const.Verdict], typing.List[typing.Tuple[Const.Verdict, Path, float]]]:
         """
         Generate output files with given solution module and input files.
         If `compare` flag is True, then it compares result
         against given `answers` and determine AC/WA.
-        If `raiseOnInvalidVerdict` is False, then return List of Tuples(Verdict, Path).
+        If `raiseOnInvalidVerdict` is False, then return List of Tuples(Verdict, Path, float).
         """
         if not inputFiles:
             raise ValueError("No input files given")
@@ -406,7 +407,7 @@ class AzadCore:
                 self.fs.pop(errLog)
             gc.collect()
             return [outfilePath for (_0, outfilePath, _2) in result] if raiseOnInvalidVerdict \
-                else [(verdicts[i], result[i][1]) for i in range(len(inputFiles))]
+                else [(verdicts[i], result[i][1], dtDistribution[i]) for i in range(len(inputFiles))]
 
     def generateOutputs(self, inputFiles: typing.List[Path],
                         mainACOnly: bool = True) -> list:
@@ -644,21 +645,25 @@ class AzadCore:
         # Run all other solution files
         results = []
         verdicts = []
+        distributions = []
         solutionIndex = -1
         for category in self.solutionModules:
             for i in range(len(self.solutionModules[category])):
                 module = self.solutionModules[category][i]
-                if module is mainACModule:
-                    continue
+                # Run Main Code For File linking in /Invocation foler
+                # if module is mainACModule: 
+                #     continue
                 solutionIndex += 1
                 results.append([])
                 verdicts.append([])
+                distributions.append([])
                 result = self.generateOutput(
                     module, inputFiles, category, answers=answers, raiseOnInvalidVerdict=False,
                     solutionName=formatPathForLog(self.config.solutions[category][i]))
                 for j in range(len(result)):
-                    verdict, outfilePath = result[j]
+                    verdict, outfilePath, distribution = result[j]
                     verdicts[solutionIndex].append(verdict)
+                    distributions[solutionIndex].append(distribution)
                     if verdict == Const.Verdict.AC or verdict == Const.Verdict.WA:
                         try:
                             results[solutionIndex].append(IOData.parseMulti(
@@ -688,63 +693,96 @@ class AzadCore:
         for category in self.solutionModules:
             for i in range(len(self.solutionModules[category])):
                 module = self.solutionModules[category][i]
-                if module is mainACModule:
-                    continue
+                # if module is mainACModule:
+                #     continue
                 solutionIndex += 1
                 if not (self.config.invocationPath / str(solutionIndex + 1)).exists():
                     (self.config.invocationPath / str(solutionIndex + 1)).mkdir()
-                IOData.cleanIOFilePath(self.config.invocationPath / str(solutionIndex + 1))
+                IOData.cleanIOFilePath(self.config.invocationPath / str(solutionIndex + 1), ("in", "out", "txt", "html", "css", "js", ))
                 self.writePGInvocationFiles(results[solutionIndex], solutionIndex=solutionIndex + 1)
 
         logger.info("PG-transformed and wrote all data into files.")
+        IOData.cleanIOFilePath(self.config.invocationPath, ("html", "css", "js", ))
 
-        # Lets make report.md
-        with open(self.config.invocationPath / "_Invocation.md", "w") as invocationFile:
-            tmp = []
-            passedTests = [0 for i in range(len(results))]
-            
-            # Link solution files
-            tmp.append("|#| ")
-            for category in self.solutionModules:
-                for i in range(len(self.solutionModules[category])):
-                    module = self.solutionModules[category][i]
-                    tmp.append("[%s](%s%s%s)|" % \
-                        ("Main AC Solution" if module is mainACModule else formatPathForLog(self.config.solutions[category][i], maxDepth=1)[3:], 
-                        self.config.pathPrefix, 
-                        self.config.solutions[category][i], 
-                        self.config.pathSuffix))
-            tmp.append("\n|-|")
+        # make report data & html pages
+        reportPath = Const.ResourcesPath / "report"
+        solutionIndex = -1
+        reportObject = []
 
-            # Bar Line
-            for j in range(len(results)+1):
-                tmp.append("-|")
-            
-            # Link IO files
-            for i in range(len(inputFiles)):
-                tmp.append("\n|[%d](%s%s%s)|" % \
-                    (i + 1,
-                    self.config.pathPrefix, 
-                    str(self.config.IOPath / (self.config.inputFilePathSyntax % (i + 1,))), 
-                    self.config.pathSuffix))
-                tmp.append("[AC](%s%s%s)|" % \
-                    (self.config.pathPrefix, 
-                    str(self.config.IOPath / (self.config.outputFilePathSyntax % (i + 1,))), 
-                    self.config.pathSuffix))
-                for j in range(len(verdicts)):
-                    if verdicts[j][i] == Const.Verdict.AC:
-                        passedTests[j] += 1
-                    tmp.append("[%s](%s%s%s)|" % \
-                        (verdicts[j][i].value if verdicts[j][i] == Const.Verdict.AC else ("__**%s**__" % verdicts[j][i].value),
-                        self.config.pathPrefix, 
-                        str(self.config.invocationPath / str(j+1) / (self.config.outputFilePathSyntax % (i + 1,))), 
-                        self.config.pathSuffix))
-            
-            # Passed Tests
-            tmp.append("\n|Passed Tests|%d/%d|" % (len(inputFiles), len(inputFiles)) )
-            for ACCount in passedTests:
-                tmp.append("%d/%d|" % (ACCount, len(inputFiles)))
-            invocationFile.write(''.join(tmp))
+        with open(reportPath / "detail.html.template", "r") as detailFile:
+            detailPageTemplate = StringTemplate(detailFile.read())
+        for category in self.solutionModules:
+            for i in range(len(self.solutionModules[category])):
+                module = self.solutionModules[category][i]
+                solutionIndex += 1
+                if module is mainACModule:
+                    MCSIndex = solutionIndex
+                reportObject.append({
+                    "solution": "Main AC Solution" if module is mainACModule \
+                        else formatPathForLog(self.config.solutions[category][i], maxDepth=1)[3:],
+                    "verdict": list(map(lambda x: x.value, verdicts[solutionIndex])),
+                    "distribution": distributions[solutionIndex]
+                })
+                # make PGOut Data to js file for html pages
+                for j, res in enumerate(results[solutionIndex]):
+                    logger.debug("Writing '%s'..." % \
+                        (self.config.invocationPath / \
+                        str(solutionIndex + 1) / \
+                        ("tc" + str(j + 1) + ".js"))
+                    )
+                    # test case data to js
+                    with open(self.config.invocationPath / \
+                        str(solutionIndex + 1) / \
+                        ("tc" + str(j + 1) + ".js"), "w"
+                    ) as tcFile:
+                        if not res:
+                            tcFile.write(("window.__TCH__isAC = false;\n" + \
+                                "window.__TCH__isFail = true;\n" + \
+                                "window.__TCH__tcData = '';\n" + \
+                                "window.__TCH__acData = `%s`;\n") % ( \
+                                    IOData.PGizeData(answers[j], self.config.returnType)
+                                )
+                            )
+                        else:
+                            tcFile.write(("window.__TCH__isAC = %s;\n" + \
+                                "window.__TCH__isFail = false;\n" + \
+                                "window.__TCH__tcData = `%s`;\n" + \
+                                "window.__TCH__acData = `%s`;\n") % ( \
+                                    ["false", "true"][verdicts[solutionIndex][j] == Const.Verdict.AC],
+                                    IOData.PGizeData(res, self.config.returnType),
+                                    IOData.PGizeData(answers[j], self.config.returnType)
+                                )
+                            )
+                    
+                    # copy detail page
+                    with open(self.config.invocationPath / \
+                        str(solutionIndex + 1) / \
+                        ("detail" + str(j + 1) + ".html"), "w"
+                    ) as dest:
+                        dest.write(detailPageTemplate.substitute({"index": str(j + 1)}))
+        
+        # copy main page
+        with open(reportPath / "report.html", "r") as src:
+            with open(self.config.invocationPath / "report.html", "w") as dest:
+                dest.write(src.read())
+        with open(reportPath / "report.js", "r") as src:
+            with open(self.config.invocationPath / "report.js", "w") as dest:
+                dest.write(src.read())
+        with open(reportPath / "style.css", "r") as src:
+            with open(self.config.invocationPath / "style.css", "w") as dest:
+                dest.write(src.read())
+        with open(reportPath / "detail.js", "r") as src:
+            with open(self.config.invocationPath / "detail.js", "w") as dest:
+                dest.write(src.read())
+        
 
+
+        logger.debug("Writing 'data.js'...")
+        with open(self.config.invocationPath / "data.js", "w") as reportFile:
+            reportFile.write("window.__TCH__data = " + json.dumps(reportObject, indent=4) + \
+                "\nwindow.__TCH__MCSIndex = " + str(MCSIndex) + "\n")
+
+        logger.info("Wrote all report data into files.")
 
     def run(self, mode: Const.AzadLibraryMode, stressTestIndex: int = 0):
         """

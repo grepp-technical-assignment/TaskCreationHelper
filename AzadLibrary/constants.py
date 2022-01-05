@@ -25,8 +25,6 @@ SupportedConfigVersion = 1.0
 DefaultFloatPrecision = 1e-6
 DefaultIOPath = "IO"
 DefaultInvocationPath = "Invocation"
-DefaultPathPrefix = "vscode://vscode-remote/wsl+ubuntu/" # Edit here if not using WSL / VSCode (ex. "vscode://file//", "file://")
-DefaultPathSuffix = ":0"
 DefaultInputSyntax = "%02d.in.txt"
 DefaultOutputSyntax = "%02d.out.txt"
 DefaultTimeLimit = 5.0  # seconds
@@ -247,8 +245,6 @@ StartingConfigState = {
     "iofiles": {
         "path": DefaultIOPath,
         "invocationPath": DefaultInvocationPath,
-        "pathPrefix": DefaultPathPrefix,
-        "pathSuffix": DefaultPathSuffix,
         "inputsyntax": DefaultInputSyntax,
         "outputsyntax": DefaultOutputSyntax,
     },

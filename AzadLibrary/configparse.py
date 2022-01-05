@@ -136,15 +136,11 @@ class TaskConfiguration:
                 raise TypeError
             self.IOPath: Path = cwd / iofiles["path"]
             self.invocationPath: Path = cwd / iofiles["invocationPath"]
-            self.pathPrefix = iofiles["pathPrefix"]
-            self.pathSuffix = iofiles["pathSuffix"]
             self.inputFilePathSyntax = iofiles["inputsyntax"]
             self.outputFilePathSyntax = iofiles["outputsyntax"]
         except (TypeError, KeyError):
             self.IOPath: Path = cwd / Const.DefaultIOPath
             self.invocationPath: Path = cwd / Const.DefaultInvocationPath
-            self.pathPrefix = Const.DefaultPathPrefix
-            self.pathSuffix = Const.DefaultPathSuffix
             self.inputFilePathSyntax = Const.DefaultInputSyntax
             self.outputFilePathSyntax = Const.DefaultOutputSyntax
         if not self.IOPath.exists():

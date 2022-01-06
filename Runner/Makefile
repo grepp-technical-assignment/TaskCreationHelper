@@ -11,6 +11,7 @@ ifeq ($(OS),Windows_NT)
 	SRC_PATH = src
 	OBJ_PATH = obj
 	INCLUDE_PATH = include
+	TCH_VERSION = $(shell type ..\VERSION)
 else
     RM = rm -f
     RRM = rm -f -r
@@ -20,9 +21,9 @@ else
 	SRC_PATH = ./src
 	OBJ_PATH = ./obj
 	INCLUDE_PATH = ./include
+	TCH_VERSION = $(shell cat $(PWD)/../VERSION)
 endif
 
-TCH_VERSION = $(shell cat $(PWD)/../VERSION)
 SRCS = $(notdir $(wildcard $(SRC_PATH)/*.c))
 OBJS = $(SRCS:.c=.o)
 OBJECTS = $(patsubst %.o,$(OBJ_PATH)/%.o,$(OBJS))

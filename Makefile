@@ -1,12 +1,15 @@
 IMAGE_NAME ?= tch
 CONTAINER_NAME ?= TCH
-VOLUME ?= $(PWD):/TCH/VOLUME
 
-CAT := $(if $(filter $(OS),Windows_NT),type,cat)
 DOCKER = docker
 
-VERSION = $(shell $(CAT) $(PWD)/VERSION)
-
+ifeq ($(OS),Windows_NT)
+    VERSION := $(shell type VERSION)
+	VOLUME ?= $(CURDIR):/TCH/VOLUME
+else
+    VERSION = $(shell cat $(PWD)/VERSION)
+	VOLUME ?= $(PWD):/TCH/VOLUME
+endif
 
 DANGLING_IMAGE = $(shell $(DOCKER) images -f dangling=true -q)
 LATEST_TCH_IMAGE = $(shell $(DOCKER) images --filter=reference="tch" -q)

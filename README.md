@@ -10,6 +10,7 @@ I strongly recommend you to use Visual Studio Code for convenience, but you can 
 3. Execution and comparison between multiple solution files: You can label an expected verdict for each solution file, and TCH will automatically verify it.
 4. Output data generation: You don't have to generate output data explicitly. Instead, TCH will generate output data by main AC solution file.
 5. Automated stress testing: You can stress-test multiple solution files easily. Just configure stresses and TCH will create thousands(or more!) of tests and verify if all solution files works fine.
+6. GUI Report: You can debug more easily. You can see what results each solution has produced and how it is different from the answer. You just have to write one function - `invocate`.
 
 All things above are possible in only one command. All dirty background jobs will be handled by TCH. You can focus on tasks itself.
 
@@ -19,11 +20,11 @@ All things above are possible in only one command. All dirty background jobs wil
 
 * Linux (Main development is going under WSL 2 Ubuntu)
 * MacOS X
+* Windows (With Docker)
 
 Followings are list of unsupported operation systems.
 
 * WSL 1: WSL 1 is **not safe** to use this library due to [lack of resource management](https://github.com/microsoft/WSL/issues/4509).
-* Windows: Due to incompatibilities, Windows is currently not supported.
 
 ## Programming Languages
 
@@ -299,3 +300,4 @@ There are two types of I/O Data Protocol in TCH.
 ## v1.2
 
 - Now TCH supports reporting.
+- Now TCH supports native Windows. (With Docker)

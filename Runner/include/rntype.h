@@ -20,20 +20,4 @@ typedef const CHAR*     LPCSTR;
 
 typedef unsigned int    SIZE_T;
 
-enum level_t {
-    GENERATE,
-    PRODUCE,
-    STRESS,
-    FULL,
-    INVOCATE,
-};
-
-static LPCSTR level_t_name[] = {
-    "generate",
-    "produce",
-    "stress",
-    "full",
-    "invocate",
-};
-
 #endif // __RNLIB_H__

@@ -15,6 +15,14 @@
 
 #define MAX_CL_LEN 1024
 
+enum level_t {
+    GENERATE,
+    PRODUCE,
+    STRESS,
+    FULL,
+    INVOCATE,
+};
+
 struct config_t {
     CHAR cmd[MAX_CL_LEN];
     CHAR path[MAX_CL_LEN];

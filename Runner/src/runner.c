@@ -153,6 +153,13 @@ VOID STDCALL make_path(struct config_t* config) {
  * @return VOID 
  */
 VOID STDCALL make_run_command(struct config_t* config) {
+    LPCSTR level_t_name[] = {
+        "generate",
+        "produce",
+        "stress",
+        "full",
+        "invocate",
+    };
     sprintf(config->cmd,
         "docker run --name TCH_RUNNER --rm -it "
         "-v %s:/TCH/VOLUME "    // path

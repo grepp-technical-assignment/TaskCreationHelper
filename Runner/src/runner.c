@@ -115,6 +115,10 @@ VOID STDCALL make_path(struct config_t* config) {
         printf("tch: no input path\n");
         exit(EXIT_FAILURE);
     }
+    // cut off the last slash
+    for (INT ln = strlen(config->path) - 1; ln >= 0 && config->path[ln] == FILE_SLASH_C; --ln) {
+        config->path[ln] = 0;
+    }
 
     // if not absolute path then get current working directory
     if (!is_absolute_path(config->path)) {

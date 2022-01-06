@@ -70,3 +70,4 @@ You can use TCH Runner like this.
 ## v0.2
 
 * Add invocation level option.
+* Now TCH Runner supports native Windows.

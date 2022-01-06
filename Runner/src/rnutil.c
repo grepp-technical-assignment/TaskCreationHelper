@@ -22,7 +22,7 @@ VOID STDCALL check_system_function() {
  * @return VOID 
  */
 VOID STDCALL check_docker() {
-    if (SYSTEM("docker --version > /dev/null 2>&1")) {
+    if (SYSTEM("docker --version > " DEVNULL " 2>&1")) {
         printf("tch: docker is not installed\n");
         exit(EXIT_FAILURE);
     }
@@ -36,7 +36,7 @@ VOID STDCALL check_docker() {
  * @return VOID 
  */
 VOID STDCALL check_docker_daemon() {
-    if (SYSTEM("docker images > /dev/null 2>&1")) {
+    if (SYSTEM("docker images > " DEVNULL " 2>&1")) {
         printf("tch: docker daemon is not running\n");
         exit(EXIT_FAILURE);
     }

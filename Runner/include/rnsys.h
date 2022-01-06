@@ -22,15 +22,19 @@
 #if defined(__linux__)
     #define __TCH_SUPPORTED_OS__
     #define SYSTEM system
+    #define DEVNULL "/dev/null"
 #elif defined(__APPLE__)
     #define __TCH_SUPPORTED_OS__
     #define SYSTEM system
+    #define DEVNULL "/dev/null"
 #elif defined(_WIN32)
     #define __TCH_SUPPORTED_OS__
     #define SYSTEM system
+    #define DEVNULL "nul"
 #elif defined(_WIN64)
     #define __TCH_SUPPORTED_OS__
     #define SYSTEM system
+    #define DEVNULL "nul"
 #endif
 
 #endif // __RNSYS_H__ //

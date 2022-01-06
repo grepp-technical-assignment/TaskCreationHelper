@@ -15,7 +15,8 @@ import signal
 
 
 # Azad Library Version
-AzadLibraryVersion = "1.2.0"
+with open(Path(__file__).parent.parent / "VERSION", "r") as versionFile:
+    AzadLibraryVersion = versionFile.read().strip()
 
 # Extra constraints
 MinimumPythonVersion = (3, 8, 0)

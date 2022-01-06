@@ -20,11 +20,17 @@
  * checking os type
  */
 #if defined(__linux__)
-#define __TCH_SUPPORTED_OS__
-#define SYSTEM system
+    #define __TCH_SUPPORTED_OS__
+    #define SYSTEM system
 #elif defined(__APPLE__)
-#define __TCH_SUPPORTED_OS__
-#define SYSTEM system
+    #define __TCH_SUPPORTED_OS__
+    #define SYSTEM system
+#elif defined(_WIN32)
+    #define __TCH_SUPPORTED_OS__
+    #define SYSTEM system
+#elif defined(_WIN64)
+    #define __TCH_SUPPORTED_OS__
+    #define SYSTEM system
 #endif
 
 #endif // __RNSYS_H__ //

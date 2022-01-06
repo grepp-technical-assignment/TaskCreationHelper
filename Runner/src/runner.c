@@ -21,15 +21,13 @@ VOID STDCALL print_usage() {
 /**
  * @brief print runner version & tch version
  * 
- * TODO: optimize tch version printing
- * 
  * @return VOID 
  */
 VOID STDCALL print_version() {
-    if (SYSTEM("docker run --name TCH_GET_VERSION --rm -it tch:latest -v")) {
-        printf("tch: tch images is not built in docker\n");
-        exit(EXIT_FAILURE);
-    }
+#ifndef TCH_VERSION // This macro will be define in compiler option
+#define TCH_VERSION "Unknown"
+#endif
+    printf("TaskCreationHelper v%s\n", TCH_VERSION);
     printf("tch-runner %s\n", RUNNER_VERSION);
 }
 

@@ -8,6 +8,7 @@ This project is a simple runner for TCH in command line interface.
 
 * Linux
 * MacOS X
+* Windows
 
 ## Programming Language
 
@@ -57,8 +58,8 @@ You can use TCH Runner like this.
 
 # TODO
 
-* Optimize version control
 * Check if the docker image is installed
+* Remove system function to docker run & use docker api
 
 # Changelog
 

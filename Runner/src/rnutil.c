@@ -70,6 +70,24 @@ BOOL STDCALL is_dir(LPCSTR dir) {
 }
 
 /**
+ * @brief Check path is absolute or relative
+ * 
+ * @param path - path to check
+ * @return BOOL - TRUE if path is absolute, FALSE if not
+ */
+BOOL STDCALL is_absolute_path(LPCSTR path) {
+#if defined(__linux__) || defined(__APPLE__)
+    return path[0] == FILE_SLASH_C;
+#elif defined(_WIN32) || defined(_WIN64)
+    INT sz = strlen(path);
+    return (path[0] == FILE_SLASH_C) || (sz > 2 && path[1] == ':' && path[2] == FILE_SLASH_C);
+#else
+    puts("tch: unknown system");
+    exit(EXIT_FAILURE);
+#endif
+}
+
+/**
  * @brief check if the str is end with
  * 
  * @param str - string to check

@@ -13,6 +13,7 @@ VOID STDCALL check_docker();
 VOID STDCALL check_docker_daemon();
 BOOL STDCALL is_exist(LPCSTR);
 BOOL STDCALL is_dir(LPCSTR);
+BOOL STDCALL is_absolute_path(LPCSTR);
 BOOL STDCALL end_with(LPSTR, LPCSTR);
 
 #endif // __RNUTIL_H__ //

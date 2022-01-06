@@ -29,6 +29,8 @@ Enter this command to install tch runner.
  $ make install
 ~~~
 
+In Windows OS, you need to setting PATH environment variable. append `.../TaskCreationHelper/Runner/bin` to PATH.
+
 ## Uninstallation
 
 Enter this command to uninstall tch runner.

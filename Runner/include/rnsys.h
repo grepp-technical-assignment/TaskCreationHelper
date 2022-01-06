@@ -18,23 +18,21 @@
  *  _WIN32          Defined on Windows
  * 
  * checking os type
+ * 
+ * Warn: If you append new supported os, then you need to change "rnutil.c: is_absolute_path()"
  */
-#if defined(__linux__)
+#if defined(__linux__) || defined(__APPLE__)
     #define __TCH_SUPPORTED_OS__
     #define SYSTEM system
     #define DEVNULL "/dev/null"
-#elif defined(__APPLE__)
-    #define __TCH_SUPPORTED_OS__
-    #define SYSTEM system
-    #define DEVNULL "/dev/null"
-#elif defined(_WIN32)
-    #define __TCH_SUPPORTED_OS__
-    #define SYSTEM system
-    #define DEVNULL "nul"
-#elif defined(_WIN64)
+    #define FILE_SLASH_S "/"
+    #define FILE_SLASH_C '/'
+#elif defined(_WIN32) || defined(_WIN64)
     #define __TCH_SUPPORTED_OS__
     #define SYSTEM system
     #define DEVNULL "nul"
+    #define FILE_SLASH_S "\\"
+    #define FILE_SLASH_C '\\'
 #endif
 
 #endif // __RNSYS_H__ //

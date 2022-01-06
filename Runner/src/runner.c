@@ -117,12 +117,12 @@ VOID STDCALL make_path(struct config_t* config) {
     }
 
     // if not absolute path then get current working directory
-    if (config->path[0] != '/') {
+    if (!is_absolute_path(config->path)) {
         if (getcwd(cwd, sizeof(cwd)) == NULL) {
             printf("tch: getcwd error\n");
             exit(EXIT_FAILURE);
         }
-        strcat(cwd, "/");
+        strcat(cwd, FILE_SLASH_S);
         strcat(cwd, config->path);
         memcpy(config->path, cwd, sizeof config->path);
     }
@@ -166,7 +166,7 @@ VOID STDCALL make_run_command(struct config_t* config) {
         "tch:latest -l %s"      // level
         "%s%s"                  // stress index
         "%s"                    // pause on err
-        "%s "                  // reduced debug
+        "%s "                   // reduced debug
         "-c VOLUME/config.json",
         
         config->path,

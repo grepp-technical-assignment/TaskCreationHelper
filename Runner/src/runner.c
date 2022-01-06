@@ -116,7 +116,7 @@ VOID STDCALL make_path(struct config_t* config) {
         exit(EXIT_FAILURE);
     }
     // cut off the last slash
-    for (INT ln = strlen(config->path) - 1; ln >= 0 && config->path[ln] == FILE_SLASH_C; --ln) {
+    for (INT ln = (INT)strlen(config->path) - 1; ln > 0 && config->path[ln] == FILE_SLASH_C; --ln) {
         config->path[ln] = 0;
     }
 

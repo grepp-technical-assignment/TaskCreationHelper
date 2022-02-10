@@ -9,7 +9,7 @@ ENV TZ=Asia/Seoul
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 # env setting & compiler installation
-RUN apt-get update -y && apt-get -y upgrade && \
+RUN apt-get update -y && \
     apt-get install -y --no-install-recommends \
         python3-pip \
         python3.8 \

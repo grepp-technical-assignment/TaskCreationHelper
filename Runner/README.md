@@ -73,3 +73,7 @@ You can use TCH Runner like this.
 
 * Add invocation level option.
 * Now TCH Runner supports native Windows.
+
+## v0.3
+
+* TCH Runner supports `-i`, `--init` option.

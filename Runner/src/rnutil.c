@@ -42,6 +42,50 @@ VOID STDCALL check_docker_daemon() {
     }
 }
 
+/**
+ * @brief Make directory recursively
+ * 
+ * @param path - directory path to make (path must be absolute path)
+ * @param mode - directory mode
+ * @return BOOL - TRUE if make directory successfully, FALSE if not
+ */
+BOOL STDCALL make_dir(LPCSTR path, mode_t mode) {
+    CHAR tmp_path[MAX_CL_LEN]; tmp_path[0] = 0;
+    INT index_stack[MAX_CL_LEN]; index_stack[0] = 0;
+
+    if (path == NULL) return TRUE;
+    if (!is_absolute_path(path)) return FALSE;
+
+    memcpy(tmp_path, path, sizeof tmp_path);
+    INT n = strlen(path), index_len = 0;
+    BOOL recovery = FALSE;
+    
+    // make path recursively
+    if (tmp_path[n - 1] == FILE_SLASH_C) tmp_path[--n] = 0;
+    for (INT i = 0; i <= n; ++i) {
+        if (i > 0 && (tmp_path[i] == FILE_SLASH_C || i == n)) {
+            tmp_path[i] = 0;
+            if (!is_dir(tmp_path)) {
+                if (mkdir(tmp_path, mode) == -1) {
+                    recovery = TRUE;
+                    break;
+                }
+                index_stack[index_len++] = i;
+            }
+            if (i != n) tmp_path[i] = FILE_SLASH_C;
+        }
+    }
+
+    // remove created directory recursively
+    if (recovery) {
+        for (INT i = index_len; i--; ) {
+            tmp_path[index_stack[i]] = 0;
+            remove(tmp_path);
+        }
+        return FALSE;
+    }
+    return TRUE;
+}
 
 /**
  * @brief Check dir is exist or not

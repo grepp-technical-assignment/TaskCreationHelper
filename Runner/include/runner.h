@@ -27,6 +27,7 @@ struct config_t {
     CHAR cmd[MAX_CL_LEN];
     CHAR path[MAX_CL_LEN];
     enum level_t level;
+    BOOL initialize;
     BOOL pause_on_err;
     BOOL reduced_debug;
     LPCSTR stress_index;
@@ -39,5 +40,7 @@ VOID STDCALL parse_args(struct config_t*, int, char**);
 VOID STDCALL make_path(struct config_t*);
 VOID STDCALL make_run_command(struct config_t*);
 VOID STDCALL run_command(struct config_t*);
+VOID STDCALL generate_config(struct config_t*);
+VOID STDCALL generate_statement(struct config_t*);
 
 #endif // __RUNNER_H__ //

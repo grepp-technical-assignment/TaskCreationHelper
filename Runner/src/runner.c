@@ -246,6 +246,8 @@ VOID STDCALL generate_config(struct config_t* config) {
 #include "default_config"
     );
 
+    printf("tch: config file is generated\n");
+
     fclose(fp);
 }
 
@@ -275,6 +277,8 @@ VOID STDCALL generate_statement(struct config_t* config) {
     fprintf(fp,
 #include "default_statement"
     );
+
+    printf("tch: statement file is generated\n");
 
     fclose(fp);
 }

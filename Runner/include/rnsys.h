@@ -27,12 +27,14 @@
     #define DEVNULL "/dev/null"
     #define FILE_SLASH_S "/"
     #define FILE_SLASH_C '/'
+    #define MK_DIR(dir, mode) mkdir((dir), (mode))
 #elif defined(_WIN32) || defined(_WIN64)
     #define __TCH_SUPPORTED_OS__
     #define SYSTEM system
     #define DEVNULL "nul"
     #define FILE_SLASH_S "\\"
     #define FILE_SLASH_C '\\'
+    #define MK_DIR(dir, mode) mkdir(dir)
 #endif
 
 #endif // __RNSYS_H__ //

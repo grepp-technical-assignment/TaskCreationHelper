@@ -66,7 +66,7 @@ BOOL STDCALL make_dir(LPCSTR path, mode_t mode) {
         if (i > 0 && (tmp_path[i] == FILE_SLASH_C || i == n)) {
             tmp_path[i] = 0;
             if (!is_dir(tmp_path)) {
-                if (mkdir(tmp_path, mode) == -1) {
+                if (MK_DIR(tmp_path, mode) == -1) {
                     recovery = TRUE;
                     break;
                 }

@@ -47,6 +47,7 @@ VOID STDCALL parse_args(struct config_t* config, int argc, char** argv) {
     config->pause_on_err = FALSE;
     config->reduced_debug = FALSE;
     config->stress_index = NULL;
+    config->initialize = FALSE;
 
     for (int i = 1; i < argc; ++i) {
         if (argv[i][0] == '-') {

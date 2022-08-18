@@ -16,6 +16,7 @@ VOID STDCALL print_usage() {
     printf("%-24s%s", "  -p, --pause_on_err", "Pause on error\n");
     printf("%-24s%s", "  -r, --reduced_debug", "Reduce amount of debugging\n");
     printf("%-24s%s", "  -i, --init", "Initialize Problem Repository in PATH\n");
+    printf("%-24s%s", "  -t, --text_filter", "Filtering Problem Statement in PATH\n");
     printf("%-24s%s", "  PATH", "Relative path to the TCH project\n");
 }
 
@@ -92,6 +93,8 @@ VOID STDCALL parse_args(struct config_t* config, int argc, char** argv) {
                 config->reduced_debug = TRUE;
             } else if (strcmp(argv[i], "-i") == 0 || strcmp(argv[i], "--init") == 0) {
                 config->initialize = TRUE;
+            } else if (strcmp(argv[i], "-t") == 0 || strcmp(argv[i], "--text_filter") == 0) {
+                config->text_filter = TRUE;
             } else {
                 printf("tch: unknown argument '%s'\n", argv[i]);
                 exit(EXIT_FAILURE);
@@ -204,7 +207,9 @@ VOID STDCALL make_run_command(struct config_t* config) {
  * @return VOID 
  */
 VOID STDCALL run_command(struct config_t* config) {
-    if (config->initialize) { // initialize problem repository
+    if (config->text_filter) { // filtering text to plain text
+        filtering_text(config);
+    } else if (config->initialize) { // initialize problem repository
         generate_config(config);
         generate_statement(config);
     } else if (SYSTEM(config->cmd)) { // run tch
@@ -282,4 +287,73 @@ VOID STDCALL generate_statement(struct config_t* config) {
     printf("tch: statement file is generated\n");
 
     fclose(fp);
+}
+
+/**
+ * @brief filtering text file in path/statement.md
+ *  remove invisible special characters from macOS
+ * TODO: Need to handling unicode characters
+ *  if i write statement.md file length upper than STATEMENT_BUF_SIZE
+ *  then error occurred
+ * 
+ * @param config 
+ * @return VOID 
+ */
+VOID STDCALL filtering_text(struct config_t* config) {
+    CHAR statement_path[MAX_CL_LEN];
+    CHAR filtered_statement_path[MAX_CL_LEN];
+    statement_path[0] = 0;
+    filtered_statement_path[0] = 0;
+
+    // initialize file path
+    sprintf(statement_path,
+        "%s%sstatement.md",
+        config->path,
+        (config->path[strlen(config->path) - 1] == FILE_SLASH_C ? "" : FILE_SLASH_S)
+    );
+    sprintf(filtered_statement_path,
+        "%s%sTCH_filtered_statement.md",
+        config->path,
+        (config->path[strlen(config->path) - 1] == FILE_SLASH_C ? "" : FILE_SLASH_S)
+    );
+
+    INT deleted_count = 0;
+
+    FILE* fp = fopen(statement_path, "r");
+    if (fp == NULL) {
+        printf("tch: can't read statement file in '%s'\n", statement_path);
+        exit(EXIT_FAILURE);
+    }
+    FILE* outp = fopen(filtered_statement_path, "w");
+    if (outp == NULL) {
+        printf("tch: can't write filtered statement file in '%s'\n", filtered_statement_path);
+        exit(EXIT_FAILURE);
+    }
+    for (; !feof(fp); ) {
+        CHAR buf[STATEMENT_BUF_SIZE + 4]; buf[0] = 0;
+        SIZE_T read_size;
+        read_size = fread(buf, sizeof(CHAR), STATEMENT_BUF_SIZE, fp);
+        if (read_size == 0) {
+            printf("tch: statement file read error\n");
+            exit(EXIT_FAILURE);
+        }
+        buf[read_size] = 0;
+        for (INT i = sizeof statement_filter_str / sizeof(LPCSTR); i--; ) {
+            for (; ;) {
+                LPSTR pivot = strstr(buf, statement_filter_str[i]);
+                if (pivot == NULL) break;
+                ++deleted_count;
+                SIZE_T filter_size = strlen(statement_filter_str[i]);
+                SIZE_T pindex = pivot - buf;
+                memmove(pivot, pivot + filter_size, sizeof(CHAR) * (read_size + 1 - pindex - filter_size));
+                read_size -= filter_size;
+            }
+        }
+        fwrite(buf, sizeof(CHAR), read_size, outp);
+    }
+    fclose(fp);
+    fclose(outp);
+
+    printf("tch: special characters deleted count = %d\n", deleted_count);
+    printf("tch: TCH_filtered_statement file is generated\n");
 }

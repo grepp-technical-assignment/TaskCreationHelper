@@ -77,3 +77,4 @@ You can use TCH Runner like this.
 ## v0.3
 
 * TCH Runner supports `-i`, `--init` option.
+* TCH Runner supports `-t`, `--text_filter` option.

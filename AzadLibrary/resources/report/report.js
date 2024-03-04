@@ -54,7 +54,7 @@ window.onload = function() {
 
     headFrag.appendChild(makeLine(['#'].concat(solutions), 'th'));
     for (var i = 0; i < pdata.length; ++i) {
-        bodyFrag.appendChild(makeLine([i].concat(pdata[i]), 'td'));
+        bodyFrag.appendChild(makeLine([i+1].concat(pdata[i]), 'td'));
     }
 
     // draw //
